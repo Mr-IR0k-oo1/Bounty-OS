@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "crates/bountyos-server",
+    "crates/bountyos-cli",
+    "crates/bountyos-common",
+]
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1
