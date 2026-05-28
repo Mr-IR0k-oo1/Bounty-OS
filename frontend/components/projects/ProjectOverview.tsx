@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
 import { BarChart, Users, Calendar, DollarSign, Activity, Shield, Target, Cpu } from "lucide-react"
 
 export function ProjectOverview({

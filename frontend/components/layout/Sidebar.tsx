@@ -2,119 +2,163 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  ChevronDown,
-  ChevronRight,
-  LayoutDashboard,
-  Search,
-  Settings,
-  Users,
-  Grid3X3,
-  Layers,
-  Terminal,
+  LayoutDashboard, FolderKanban, Target, Bug, Images,
+  Activity, Radio, Settings, Users, Shield, ChevronRight, PanelLeftClose, PanelLeft, X
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-export function Sidebar() {
+const navGroups = [
+  { section: "Workspace", items: [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/projects", label: "Projects", icon: FolderKanban },
+    { href: "/programs", label: "Programs", icon: Target },
+    { href: "/findings", label: "Findings", icon: Bug },
+    { href: "/gallery", label: "Gallery", icon: Images },
+  ]},
+  { section: "Pipeline", items: [
+    { href: "/jobs", label: "Jobs", icon: Activity },
+    { href: "/monitor", label: "Monitor", icon: Radio },
+  ]},
+]
+
+export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }: { collapsed?: boolean; onClose?: () => void; onToggleCollapse?: () => void }) {
   const pathname = usePathname()
 
-  const projects = [
-    {
-      id: "1",
-      name: "UBER H1 AUDIT",
-      slug: "uber-audit",
-      expanded: true,
-      sections: [
-        { name: "Programs", href: "/projects/uber-audit/programs", icon: Layers },
-        { name: "Kanban", href: "/projects/uber-audit/kanban", icon: Grid3X3 },
-        { name: "Timeline", href: "/projects/uber-audit/timeline", icon: LayoutDashboard },
-        { name: "Terminal", href: "/projects/uber-audit/notes", icon: Terminal },
-      ],
-    },
-  ]
-
-  const globalSections = [
-    { name: "All Findings", href: "/findings", icon: Search },
-    { name: "Jobs", href: "/jobs", icon: LayoutDashboard },
-  ]
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard"
+    return pathname.startsWith(href)
+  }
 
   return (
-    <div className="hidden border-r bg-muted/10 md:block w-64 technical-surface">
-      <div className="flex h-full flex-col gap-2">
-        <div className="flex h-14 items-center border-b px-6 font-mono tracking-tighter">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-primary" />
-            <span className="text-lg font-bold">BOUNTY[OS]</span>
-          </Link>
+    <div className={cn(
+      "flex flex-col h-full border-r border-border bg-bg-elevated shrink-0",
+      collapsed ? "w-[56px]" : "w-full"
+    )}>
+      {/* Logo */}
+      <div className={cn(
+        "flex items-center h-12 border-b border-border shrink-0 relative",
+        collapsed ? "justify-center" : "gap-2.5 px-4"
+      )}>
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shrink-0 shadow-glow-primary">
+          <Shield className="w-3.5 h-3.5 text-white" />
         </div>
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <nav className="flex flex-col p-4 gap-6">
-              <div className="space-y-1">
-                <h3 className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Operations
-                </h3>
-                {projects.map((project) => (
-                  <div key={project.id} className="space-y-1">
-                    <div className="flex items-center justify-between px-2 py-1.5 text-xs font-bold border-l-2 border-primary bg-primary/5">
-                      {project.name}
-                      <ChevronDown className="h-3 w-3" />
-                    </div>
-                    <div className="space-y-0.5 mt-1">
-                      {project.sections.map((section) => (
-                        <Link
-                          key={section.href}
-                          href={section.href}
-                          className={cn(
-                            "group flex items-center gap-3 px-3 py-2 text-[13px] transition-colors border border-transparent",
-                            pathname === section.href 
-                              ? "bg-primary text-primary-foreground border-primary" 
-                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-border"
-                          )}
-                        >
-                          <section.icon className="h-4 w-4" />
-                          <span className="font-medium tracking-tight">{section.name}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {!collapsed && (
+          <>
+            <span className="font-bold text-sm tracking-tight">BountyOS</span>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="ml-auto p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-overlay transition-fast lg:hidden"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
-              <div className="space-y-1">
-                <h3 className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Global Data
-                </h3>
-                {globalSections.map((section) => (
-                  <Link
-                    key={section.href}
-                    href={section.href}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 text-[13px] transition-colors border border-transparent",
-                      pathname === section.href 
-                        ? "bg-primary text-primary-foreground border-primary" 
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    <section.icon className="h-4 w-4" />
-                    <span className="font-medium tracking-tight">{section.name}</span>
-                  </Link>
-                ))}
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-5">
+        {navGroups.map((group) => (
+          <div key={group.section}>
+            {!collapsed && (
+              <div className="px-2.5 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-widest">
+                {group.section}
               </div>
-            </nav>
-          </ScrollArea>
-        </div>
-        <div className="p-4 border-t bg-muted/5">
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Settings className="h-4 w-4" />
-            <span className="font-medium">System Configuration</span>
-          </Link>
-        </div>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      "group flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all duration-150 relative",
+                      collapsed && "justify-center px-0 mx-1",
+                      active
+                        ? "bg-primary-muted text-primary font-medium"
+                        : "text-text-muted hover:bg-bg-overlay hover:text-text-primary"
+                    )}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    {/* Active indicator */}
+                    {active && !collapsed && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-primary" />
+                    )}
+                    <Icon className={cn("w-4 h-4 shrink-0", active && "text-primary")} />
+                    {!collapsed && <span>{item.label}</span>}
+                    {collapsed && (
+                      <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-bg-elevated border border-border text-xs text-text-primary shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50">
+                        {item.label}
+                      </div>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Bottom Links */}
+      <div className="p-2 border-t border-border space-y-0.5">
+        <Link
+          href="/settings"
+          onClick={onClose}
+          className={cn(
+            "group flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all duration-150 relative",
+            collapsed && "justify-center px-0 mx-1",
+            pathname.startsWith("/settings")
+              ? "bg-primary-muted text-primary font-medium"
+              : "text-text-muted hover:bg-bg-overlay hover:text-text-primary"
+          )}
+          title={collapsed ? "Settings" : undefined}
+        >
+          <Settings className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Settings</span>}
+          {collapsed && (
+            <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-bg-elevated border border-border text-xs text-text-primary shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50">
+              Settings
+            </div>
+          )}
+        </Link>
+        <Link
+          href="/hunters"
+          onClick={onClose}
+          className={cn(
+            "group flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all duration-150 relative",
+            collapsed && "justify-center px-0 mx-1",
+            pathname.startsWith("/hunters")
+              ? "bg-primary-muted text-primary font-medium"
+              : "text-text-muted hover:bg-bg-overlay hover:text-text-primary"
+          )}
+          title={collapsed ? "Hunters" : undefined}
+        >
+          <Users className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Hunters</span>}
+          {collapsed && (
+            <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-bg-elevated border border-border text-xs text-text-primary shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50">
+              Hunters
+            </div>
+          )}
+        </Link>
+      </div>
+
+      {/* Collapse toggle */}
+      <div className="px-2 py-1.5 border-t border-border">
+        <button
+          onClick={() => onToggleCollapse?.()}
+          className="flex items-center justify-center w-full gap-1.5 py-1 rounded text-[10px] text-text-subtle hover:text-text-muted hover:bg-bg-overlay transition-fast"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <PanelLeft className={cn("w-3 h-3 transition-transform duration-200", collapsed && "rotate-180")} />
+          {!collapsed && <span>Collapse</span>}
+          {collapsed && <span className="sr-only">Expand</span>}
+        </button>
       </div>
     </div>
   )

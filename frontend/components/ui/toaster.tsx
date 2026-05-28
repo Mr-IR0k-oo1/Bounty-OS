@@ -10,10 +10,6 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 
-// This is the toaster component that will be used to display toast notifications
-// It uses the useToast hook to manage the toast state
-// and renders the toast notifications using the Toast component
-
 export function Toaster() {
   const { toasts } = useToast()
 

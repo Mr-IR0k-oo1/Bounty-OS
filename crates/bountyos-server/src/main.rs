@@ -8,10 +8,16 @@ use std::net::SocketAddr;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod alerts;
 mod app;
 mod config;
 mod db;
+mod errors;
+mod middleware;
+mod models;
+mod pipeline;
 mod redis;
+mod state;
 
 #[tokio::main]
 async fn main() {
@@ -37,11 +43,20 @@ async fn main() {
         .await
         .expect("Failed to initialize Redis pool");
 
+    // Run database migrations
+    if config.first_run {
+        db::migrations::run_migrations(&db_pool).await
+            .expect("Failed to run database migrations");
+    }
+
+    // Create WebSocket broadcast channel
+    let (ws_tx, _) = tokio::sync::broadcast::channel::<String>(256);
+
     // Build our application with routes
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(health_check))
-        .nest("/api", app::create_router(db_pool, redis_pool))
+        .nest("/api", app::create_router(db_pool, redis_pool, config.clone(), ws_tx))
         .layer(TraceLayer::new_for_http());
 
     // Run our app with hyper, listening globally on port 8000

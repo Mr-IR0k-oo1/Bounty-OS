@@ -1,0 +1,20 @@
+[package]
+name = "bountyos-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json", "native-tls"] }
+tokio = { version = "1.0", features = ["full"] }
+colored = "2.0"
+tabled = "0.15"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+anyhow = "1.0"
+
+[dependencies.bountyos-common]
+path = "../bountyos-common"

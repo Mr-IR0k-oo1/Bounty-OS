@@ -1,0 +1,26 @@
+[database]
+url = "postgres://bountyos:${DB_PASSWORD}@localhost:5432/bountyos"
+
+[redis]
+url = "redis://:${REDIS_PASSWORD}@localhost:6379"
+
+[auth]
+jwt_secret = "${JWT_SECRET}"
+access_token_expiry_minutes = 15
+refresh_token_expiry_days = 7
+argon2_memory = 65536
+argon2_iterations = 3
+argon2_parallelism = 1
+
+[server]
+host = "0.0.0.0"
+port = 8000
+first_run = true
+rust_log = "info"
+
+[rate_limiting]
+requests_per_minute = 200
+login_requests_per_15min = 5
+
+[evidence]
+base_path = "./evidence"

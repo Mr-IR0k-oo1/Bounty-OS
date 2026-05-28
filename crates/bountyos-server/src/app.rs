@@ -1,24 +1,27 @@
 //! Application router and middleware setup
 
 use axum::{
-    extract::State,
     routing::{get, post},
     Router,
 };
-use redis::RedisPool;
-use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 mod auth;
 mod handlers;
 
+use crate::config::AppConfig;
+use crate::state::AppState;
+use tokio::sync::broadcast;
+
 /// Creates the main application router
-pub fn create_router(db_pool: PgPool, redis_pool: RedisPool) -> Router {
+pub fn create_router(db_pool: sqlx::PgPool, redis_pool: crate::redis::RedisPool, config: AppConfig, ws_tx: broadcast::Sender<String>) -> Router {
     // Create shared state
     let shared_state = AppState {
         db_pool,
         redis_pool,
+        config,
+        ws_tx,
     };
 
     // Build our application with routes
@@ -180,9 +183,4 @@ pub fn create_router(db_pool: PgPool, redis_pool: RedisPool) -> Router {
         .layer(CorsLayer::permissive().and_then(TraceLayer::new_for_http()))
 }
 
-/// Application state shared across handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub db_pool: PgPool,
-    pub redis_pool: RedisPool,
-}
+
