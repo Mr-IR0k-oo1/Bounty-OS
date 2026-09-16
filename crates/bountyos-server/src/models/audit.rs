@@ -8,9 +8,9 @@ pub struct AuditLog {
     pub id: Uuid,
     pub hunter_id: Option<Uuid>,
     pub action: String,
-    pub resource: Option<String>,
-    pub resource_id: Option<Uuid>,
-    pub detail: Option<serde_json::Value>,
+    pub resource_type: String,
+    pub resource_id: Option<String>,
+    pub details: Option<serde_json::Value>,
     pub ip_address: Option<String>,
     pub created_at: DateTime<Utc>,
 }

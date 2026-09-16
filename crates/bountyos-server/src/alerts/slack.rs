@@ -1,6 +1,10 @@
 use serde_json::json;
 
-pub async fn send_slack_alert(webhook_url: &str, message: &str, severity: &str) -> Result<(), reqwest::Error> {
+pub async fn send_slack_alert(
+    webhook_url: &str,
+    message: &str,
+    severity: &str,
+) -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let emoji = match severity {
         "critical" => ":red_circle:",

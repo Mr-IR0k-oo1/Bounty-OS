@@ -1,0 +1,11 @@
+{
+  "id": "010",
+  "name": "Safe System Fixed Command",
+  "language": "c",
+  "category": "injection",
+  "tier": "C",
+  "file": "safe_system.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "system() called with constant path after input equality check"
+}

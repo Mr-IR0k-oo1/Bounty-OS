@@ -1,0 +1,11 @@
+{
+  "id": "003",
+  "name": "Format String Vulnerability",
+  "language": "c",
+  "category": "input-validation",
+  "tier": "A",
+  "file": "format_string.c",
+  "vulnerable": true,
+  "cwe": "CWE-134",
+  "description": "Direct printf(input) allowing attacker-controlled format specifiers"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "001",
+  "name": "Stack Buffer Overflow",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "A",
+  "file": "buffer_overflow.c",
+  "vulnerable": true,
+  "cwe": "CWE-121",
+  "description": "Unbounded strcpy into fixed stack buffer"
+}

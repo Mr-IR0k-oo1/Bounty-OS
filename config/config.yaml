@@ -1,26 +1,42 @@
-[database]
-url = "postgres://bountyos:${DB_PASSWORD}@localhost:5432/bountyos"
+database_url: "postgres://bountyos:bountyos_dev_password@localhost:5432/bountyos"
+redis_url: "redis://:bountyos_dev_redis@localhost:6379"
+jwt_secret: "bountyos_super_secret_jwt_key_for_dev_32bytes_long"
+first_run: true
+rust_log: "info"
+evidence_base_path: "./evidence"
 
-[redis]
-url = "redis://:${REDIS_PASSWORD}@localhost:6379"
+database:
+  url: "postgres://bountyos:bountyos_dev_password@localhost:5432/bountyos"
 
-[auth]
-jwt_secret = "${JWT_SECRET}"
-access_token_expiry_minutes = 15
-refresh_token_expiry_days = 7
-argon2_memory = 65536
-argon2_iterations = 3
-argon2_parallelism = 1
+redis:
+  url: "redis://:bountyos_dev_redis@localhost:6379"
 
-[server]
-host = "0.0.0.0"
-port = 8000
-first_run = true
-rust_log = "info"
+auth:
+  jwt_secret: "bountyos_super_secret_jwt_key_for_dev_32bytes_long"
+  access_token_expiry_minutes: 15
+  refresh_token_expiry_days: 7
+  argon2_memory: 65536
+  argon2_iterations: 3
+  argon2_parallelism: 1
 
-[rate_limiting]
-requests_per_minute = 200
-login_requests_per_15min = 5
+server:
+  host: "0.0.0.0"
+  port: 8000
+  first_run: true
+  rust_log: "info"
 
-[evidence]
-base_path = "./evidence"
+rate_limiting:
+  requests_per_minute: 200
+  login_requests_per_15min: 5
+
+evidence:
+  base_path: "./evidence"
+
+llm:
+  # Set enabled = true once Ollama is running with VulnLLM-R-7B (or any model)
+  enabled: false
+  ollama_url: "http://localhost:11434"
+  # Change to your exact Ollama model name: ollama list
+  model: "vulnllm-r-7b"
+  # Inference timeout in seconds — CPU 7B can take 60-180s
+  timeout_secs: 120

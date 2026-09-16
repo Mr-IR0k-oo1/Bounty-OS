@@ -1,0 +1,11 @@
+{
+  "id": "014",
+  "name": "SQL Injection Query Construction",
+  "language": "c",
+  "category": "injection",
+  "tier": "B",
+  "file": "sql_injection.c",
+  "vulnerable": true,
+  "cwe": "CWE-89",
+  "description": "Unescaped user input concatenated into SQL query string"
+}

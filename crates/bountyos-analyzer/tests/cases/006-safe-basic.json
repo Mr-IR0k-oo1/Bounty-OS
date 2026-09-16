@@ -1,0 +1,11 @@
+{
+  "id": "006",
+  "name": "Safe Basic Arithmetic",
+  "language": "c",
+  "category": "safe",
+  "tier": "C",
+  "file": "safe.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "Pure integer addition with no memory or external calls"
+}

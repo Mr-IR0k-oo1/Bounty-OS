@@ -48,7 +48,7 @@ pub fn parse(xml_path: &str) -> Result<Vec<Port>, ParseError> {
             subdomain_id: None,
             ip: String::new(),
             port: port_num,
-            protocol,
+            protocol: protocol.to_string(),
             service,
             state,
             banner: None,

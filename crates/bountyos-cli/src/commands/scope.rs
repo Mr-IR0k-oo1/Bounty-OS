@@ -44,7 +44,11 @@ pub async fn import(program: Option<String>, file: Option<String>) -> Result<(),
             return Ok(());
         }
     };
-    let targets: Vec<String> = content.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
+    let targets: Vec<String> = content
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
     let body = serde_json::json!({
         "program_id": program,
         "targets": targets,

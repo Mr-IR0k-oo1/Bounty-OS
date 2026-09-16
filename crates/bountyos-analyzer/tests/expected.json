@@ -1,0 +1,178 @@
+[
+  {
+    "id": "001",
+    "name": "Stack Buffer Overflow",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "A",
+    "file": "buffer_overflow.c",
+    "vulnerable": true,
+    "cwe": "CWE-121",
+    "description": "Unbounded strcpy into fixed stack buffer"
+  },
+  {
+    "id": "002",
+    "name": "Command Injection",
+    "language": "c",
+    "category": "injection",
+    "tier": "A",
+    "file": "command_injection.c",
+    "vulnerable": true,
+    "cwe": "CWE-78",
+    "description": "User input formatted into command passed to system()"
+  },
+  {
+    "id": "003",
+    "name": "Format String Vulnerability",
+    "language": "c",
+    "category": "input-validation",
+    "tier": "A",
+    "file": "format_string.c",
+    "vulnerable": true,
+    "cwe": "CWE-134",
+    "description": "Direct printf(input) allowing attacker-controlled format specifiers"
+  },
+  {
+    "id": "004",
+    "name": "Use After Free",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "A",
+    "file": "use_after_free.c",
+    "vulnerable": true,
+    "cwe": "CWE-416",
+    "description": "Dereference and write to pointer after free"
+  },
+  {
+    "id": "005",
+    "name": "Double Free",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "A",
+    "file": "double_free.c",
+    "vulnerable": true,
+    "cwe": "CWE-415",
+    "description": "Freeing identical memory pointer twice in cleanup"
+  },
+  {
+    "id": "006",
+    "name": "Safe Basic Arithmetic",
+    "language": "c",
+    "category": "safe",
+    "tier": "C",
+    "file": "safe.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "Pure integer addition with no memory or external calls"
+  },
+  {
+    "id": "007",
+    "name": "Safe Stack Copy With Bounds Check",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "C",
+    "file": "stack_overflow_safe.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "strcpy guarded by strict strlen >= sizeof(buffer) check"
+  },
+  {
+    "id": "008",
+    "name": "Safe Bounded String Copy",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "C",
+    "file": "safe_string_copy.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "Bounded copy using snprintf with buffer size limit"
+  },
+  {
+    "id": "009",
+    "name": "Safe Printf With Specifier",
+    "language": "c",
+    "category": "input-validation",
+    "tier": "C",
+    "file": "safe_printf.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "printf called with constant format string '%s'"
+  },
+  {
+    "id": "010",
+    "name": "Safe System Fixed Command",
+    "language": "c",
+    "category": "injection",
+    "tier": "C",
+    "file": "safe_system.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "system() called with constant path after input equality check"
+  },
+  {
+    "id": "011",
+    "name": "Safe Memory Management",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "C",
+    "file": "safe_memory.c",
+    "vulnerable": false,
+    "cwe": null,
+    "description": "Pointer explicitly set to NULL immediately after free"
+  },
+  {
+    "id": "012",
+    "name": "Integer Multiplication Overflow",
+    "language": "c",
+    "category": "arithmetic",
+    "tier": "B",
+    "file": "integer_overflow.c",
+    "vulnerable": true,
+    "cwe": "CWE-190",
+    "description": "Signed integer multiplication overflow leading to undersized allocation"
+  },
+  {
+    "id": "013",
+    "name": "Path Traversal in fopen",
+    "language": "c",
+    "category": "input-validation",
+    "tier": "B",
+    "file": "path_traversal.c",
+    "vulnerable": true,
+    "cwe": "CWE-22",
+    "description": "Unsanitized user filename passed into directory path opening"
+  },
+  {
+    "id": "014",
+    "name": "SQL Injection Query Construction",
+    "language": "c",
+    "category": "injection",
+    "tier": "B",
+    "file": "sql_injection.c",
+    "vulnerable": true,
+    "cwe": "CWE-89",
+    "description": "Unescaped user input concatenated into SQL query string"
+  },
+  {
+    "id": "015",
+    "name": "Missing NULL Pointer Check",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "B",
+    "file": "null_deref.c",
+    "vulnerable": true,
+    "cwe": "CWE-476",
+    "description": "Immediate array indexing on malloc return without NULL check"
+  },
+  {
+    "id": "016",
+    "name": "Heap Buffer Overflow",
+    "language": "c",
+    "category": "memory-safety",
+    "tier": "B",
+    "file": "heap_overflow.c",
+    "vulnerable": true,
+    "cwe": "CWE-122",
+    "description": "Unbounded string copy into 32-byte heap allocated chunk"
+  }
+]

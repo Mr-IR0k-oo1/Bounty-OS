@@ -1,5 +1,7 @@
 //! Database connection and pool management
 
+pub mod migrations;
+
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::time::Duration;
 

@@ -1,15 +1,14 @@
 //! Authentication handlers
 
 use axum::{
-    extract::State,
+    extract::{Extension, State},
     http::StatusCode,
     Json,
-    response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{app::AppState, models::hunter::Hunter};
+use crate::{models::hunter::Hunter, state::AppState};
 
 /// Login request
 #[derive(Debug, Deserialize)]
@@ -32,21 +31,15 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     // Find the hunter by username
-    let hunter = sqlx::query_as!(
-        Hunter,
-        r#"SELECT * FROM hunters WHERE username = $1"#,
-        payload.username,
-    )
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::UNAUTHORIZED)?;
+    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE username = $1"#)
+        .bind(&payload.username)
+        .fetch_optional(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Verify the password
-    if !crate::auth::password::verify_password(
-        &payload.password,
-        &hunter.password_hash,
-    ) {
+    if !crate::auth::password::verify_password(&payload.password, &hunter.password_hash) {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -60,14 +53,15 @@ pub async fn login(
     }
 
     // Generate JWT tokens
-    let (access_token, refresh_token) = crate::auth::tokens::generate_tokens(
-        &hunter.id,
-        &state.config.jwt_secret,
-    )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (access_token, refresh_token) =
+        crate::auth::tokens::generate_tokens(&hunter.id, &state.config().jwt_secret)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Store the refresh token in Redis
-    let mut redis_conn = state.redis_pool.clone().get_async_connection().await
+    let mut redis_conn = state
+        .redis()
+        .get_async_connection()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let refresh_token_key = format!("refresh_token:{}", hunter.id);
@@ -76,7 +70,7 @@ pub async fn login(
         .arg(&refresh_token)
         .arg("EX")
         .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async(&mut redis_conn)
+        .query_async::<_, ()>(&mut redis_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -90,10 +84,13 @@ pub async fn login(
 /// Logout handler
 pub async fn logout(
     State(state): State<AppState>,
-    user_id: Uuid,
-) -> Result<impl IntoResponse, StatusCode> {
+    Extension(user_id): Extension<Uuid>,
+) -> Result<StatusCode, StatusCode> {
     // Blacklist the session in Redis
-    let mut redis_conn = state.redis_pool.clone().get_async_connection().await
+    let mut redis_conn = state
+        .redis()
+        .get_async_connection()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let session_key = format!("session:{}", user_id);
@@ -102,7 +99,7 @@ pub async fn logout(
         .arg("1")
         .arg("EX")
         .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async(&mut redis_conn)
+        .query_async::<_, ()>(&mut redis_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -115,14 +112,18 @@ pub async fn refresh(
     refresh_token: String,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     // Verify the refresh token
-    let claims = crate::auth::tokens::verify_token(
-        &refresh_token,
-        &state.config.jwt_secret,
-    )
-    .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = crate::auth::tokens::verify_token(&refresh_token, &state.config().jwt_secret)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    if claims.token_type != "refresh" {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
 
     // Check if the refresh token exists in Redis
-    let mut redis_conn = state.redis_pool.clone().get_async_connection().await
+    let mut redis_conn = state
+        .redis()
+        .get_async_connection()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let refresh_token_key = format!("refresh_token:{}", claims.sub);
@@ -137,11 +138,10 @@ pub async fn refresh(
     }
 
     // Generate new JWT tokens
-    let (access_token, refresh_token) = crate::auth::tokens::generate_tokens(
-        &claims.sub,
-        &state.config.jwt_secret,
-    )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let (access_token, refresh_token) =
+        crate::auth::tokens::generate_tokens(&user_id, &state.config().jwt_secret)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update the refresh token in Redis
     redis::cmd("SET")
@@ -149,7 +149,7 @@ pub async fn refresh(
         .arg(&refresh_token)
         .arg("EX")
         .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async(&mut redis_conn)
+        .query_async::<_, ()>(&mut redis_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -176,43 +176,33 @@ pub struct Setup2FAResponse {
 /// 2FA setup handler
 pub async fn setup_2fa(
     State(state): State<AppState>,
-    user_id: Uuid,
+    Extension(user_id): Extension<Uuid>,
     Json(payload): Json<Setup2FARequest>,
 ) -> Result<Json<Setup2FAResponse>, StatusCode> {
     // Find the hunter by ID
-    let hunter = sqlx::query_as!(
-        Hunter,
-        r#"SELECT * FROM hunters WHERE id = $1"#,
-        user_id,
-    )
-    .fetch_one(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE id = $1"#)
+        .bind(user_id)
+        .fetch_one(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Verify the password
-    if !crate::auth::password::verify_password(
-        &payload.password,
-        &hunter.password_hash,
-    ) {
+    if !crate::auth::password::verify_password(&payload.password, &hunter.password_hash) {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
     // Generate a new TOTP secret
-    let (secret, qr_code_url) = crate::auth::totp::generate_totp_secret(
-        &hunter.username,
-        "BountyOS",
-    )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (secret, qr_code_url) =
+        crate::auth::totp::generate_totp_secret(&hunter.username, "BountyOS")
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Store the secret in the database
-    sqlx::query!(
-        r#"UPDATE hunters SET totp_secret = $1 WHERE id = $2"#,
-        secret,
-        user_id,
-    )
-    .execute(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    sqlx::query(r#"UPDATE hunters SET totp_secret = $1 WHERE id = $2"#)
+        .bind(&secret)
+        .bind(user_id)
+        .execute(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(Setup2FAResponse {
         secret,
@@ -229,45 +219,39 @@ pub struct Verify2FARequest {
 /// 2FA verification handler
 pub async fn verify_2fa(
     State(state): State<AppState>,
-    user_id: Uuid,
+    Extension(user_id): Extension<Uuid>,
     Json(payload): Json<Verify2FARequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     // Find the hunter by ID
-    let hunter = sqlx::query_as!(
-        Hunter,
-        r#"SELECT * FROM hunters WHERE id = $1"#,
-        user_id,
-    )
-    .fetch_one(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE id = $1"#)
+        .bind(user_id)
+        .fetch_one(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Verify the TOTP code
-    if !crate::auth::totp::verify_totp_code(
-        &hunter.totp_secret.unwrap_or_default(),
-        &payload.code,
-    ) {
+    if !crate::auth::totp::verify_totp_code(&hunter.totp_secret.unwrap_or_default(), &payload.code)
+    {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
     // Enable 2FA for the hunter
-    sqlx::query!(
-        r#"UPDATE hunters SET totp_enabled = true WHERE id = $1"#,
-        user_id,
-    )
-    .execute(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    sqlx::query(r#"UPDATE hunters SET totp_enabled = true WHERE id = $1"#)
+        .bind(user_id)
+        .execute(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Generate JWT tokens
-    let (access_token, refresh_token) = crate::auth::tokens::generate_tokens(
-        &hunter.id,
-        &state.config.jwt_secret,
-    )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (access_token, refresh_token) =
+        crate::auth::tokens::generate_tokens(&hunter.id, &state.config().jwt_secret)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Store the refresh token in Redis
-    let mut redis_conn = state.redis_pool.clone().get_async_connection().await
+    let mut redis_conn = state
+        .redis()
+        .get_async_connection()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let refresh_token_key = format!("refresh_token:{}", hunter.id);
@@ -276,7 +260,7 @@ pub async fn verify_2fa(
         .arg(&refresh_token)
         .arg("EX")
         .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async(&mut redis_conn)
+        .query_async::<_, ()>(&mut redis_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -290,17 +274,14 @@ pub async fn verify_2fa(
 /// Get current user handler
 pub async fn me(
     State(state): State<AppState>,
-    user_id: Uuid,
+    Extension(user_id): Extension<Uuid>,
 ) -> Result<Json<Hunter>, StatusCode> {
     // Find the hunter by ID
-    let hunter = sqlx::query_as!(
-        Hunter,
-        r#"SELECT * FROM hunters WHERE id = $1"#,
-        user_id,
-    )
-    .fetch_one(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE id = $1"#)
+        .bind(user_id)
+        .fetch_one(state.db())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(hunter))
 }

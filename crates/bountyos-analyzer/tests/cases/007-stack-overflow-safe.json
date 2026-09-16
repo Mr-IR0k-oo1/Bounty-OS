@@ -1,0 +1,11 @@
+{
+  "id": "007",
+  "name": "Safe Stack Copy With Bounds Check",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "C",
+  "file": "stack_overflow_safe.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "strcpy guarded by strict strlen >= sizeof(buffer) check"
+}

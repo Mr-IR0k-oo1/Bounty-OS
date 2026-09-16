@@ -1,0 +1,11 @@
+{
+  "id": "013",
+  "name": "Path Traversal in fopen",
+  "language": "c",
+  "category": "input-validation",
+  "tier": "B",
+  "file": "path_traversal.c",
+  "vulnerable": true,
+  "cwe": "CWE-22",
+  "description": "Unsanitized user filename passed into directory path opening"
+}

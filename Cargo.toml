@@ -5,6 +5,7 @@ members = [
     "crates/bountyos-server",
     "crates/bountyos-cli",
     "crates/bountyos-common",
+    "crates/bountyos-analyzer",
 ]
 
 [profile.release]

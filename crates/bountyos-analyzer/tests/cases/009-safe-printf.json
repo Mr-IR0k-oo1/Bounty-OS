@@ -1,0 +1,11 @@
+{
+  "id": "009",
+  "name": "Safe Printf With Specifier",
+  "language": "c",
+  "category": "input-validation",
+  "tier": "C",
+  "file": "safe_printf.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "printf called with constant format string '%s'"
+}

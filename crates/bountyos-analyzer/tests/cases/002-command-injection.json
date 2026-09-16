@@ -1,0 +1,11 @@
+{
+  "id": "002",
+  "name": "Command Injection",
+  "language": "c",
+  "category": "injection",
+  "tier": "A",
+  "file": "command_injection.c",
+  "vulnerable": true,
+  "cwe": "CWE-78",
+  "description": "User input formatted into command passed to system()"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "012",
+  "name": "Integer Multiplication Overflow",
+  "language": "c",
+  "category": "arithmetic",
+  "tier": "B",
+  "file": "integer_overflow.c",
+  "vulnerable": true,
+  "cwe": "CWE-190",
+  "description": "Signed integer multiplication overflow leading to undersized allocation"
+}

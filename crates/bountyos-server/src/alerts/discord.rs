@@ -1,4 +1,8 @@
-pub async fn send_discord_alert(webhook_url: &str, message: &str, severity: &str) -> Result<(), reqwest::Error> {
+pub async fn send_discord_alert(
+    webhook_url: &str,
+    message: &str,
+    severity: &str,
+) -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let color = match severity {
         "critical" => 0xf85149,

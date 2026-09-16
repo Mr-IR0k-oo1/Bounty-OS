@@ -1,0 +1,11 @@
+{
+  "id": "005",
+  "name": "Double Free",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "A",
+  "file": "double_free.c",
+  "vulnerable": true,
+  "cwe": "CWE-415",
+  "description": "Freeing identical memory pointer twice in cleanup"
+}

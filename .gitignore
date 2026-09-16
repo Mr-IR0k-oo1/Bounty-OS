@@ -1,0 +1,35 @@
+# Rust build artifacts
+target/
+**/target/
+
+# Database files
+/data/*.db
+/data/*.db-wal
+/data/*.db-shm
+
+# Environment variables
+.env
+.env*.local
+
+# Node.js & Next.js
+node_modules/
+**/node_modules/
+.next/
+frontend/.next/
+*.tsbuildinfo
+
+# Evidence directory contents
+evidence/*
+!evidence/.gitkeep
+
+# Cloned tools & prototypes
+tools/
+vulnllm-client/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/

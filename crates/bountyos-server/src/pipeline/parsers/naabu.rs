@@ -33,7 +33,7 @@ pub fn parse(jsonl: Vec<serde_json::Value>) -> Result<Vec<Port>, ParseError> {
             subdomain_id: None,
             ip,
             port: port_num,
-            protocol,
+            protocol: protocol.to_string(),
             service: None,
             state: "open".to_string(),
             banner: None,

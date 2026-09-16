@@ -6,11 +6,15 @@ services:
     extends:
       service: postgres
       file: docker-compose.yml
+    ports:
+      - "5432:5432"
 
   redis:
     extends:
       service: redis
       file: docker-compose.yml
+    ports:
+      - "6379:6379"
 
   server:
     extends:

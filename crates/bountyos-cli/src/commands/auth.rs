@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
-use crate::config::Config;
 use crate::client::ApiClient;
+use crate::config::Config;
 use crate::output;
 
 pub async fn login() -> Result<(), anyhow::Error> {

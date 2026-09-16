@@ -54,24 +54,25 @@ export default function TopBar() {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2.5 px-3 py-1.5 bg-bg-subtle/50 hover:bg-bg-subtle rounded-lg text-sm border border-border transition-all duration-150 w-full max-w-md"
+            className="flex items-center gap-2.5 px-3 py-1.5 bg-bg-subtle/50 hover:bg-bg-subtle rounded-lg text-sm border border-border transition-all duration-150 w-full max-w-md group"
           >
-            <Search className="w-3.5 h-3.5 text-text-muted shrink-0" />
-            <span className="text-text-muted text-xs truncate">Search projects, programs, findings...</span>
-            <div className="ml-auto flex items-center gap-0.5 text-[10px] text-text-subtle bg-bg-overlay rounded px-1 py-0.5 shrink-0">
-              <Command className="w-2.5 h-2.5" />
-              <span>K</span>
+            <Search className="w-3.5 h-3.5 text-text-muted shrink-0 group-hover:text-text-secondary transition-colors" />
+            <span className="text-text-muted text-xs truncate group-hover:text-text-secondary transition-colors">Search projects, programs, findings...</span>
+            <div className="ml-auto flex items-center gap-1 shrink-0">
+              <kbd>⌘</kbd>
+              <kbd>K</kbd>
             </div>
           </button>
 
           {/* System Status */}
-          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent-muted/30 text-xs text-accent shrink-0">
-            <span className="relative flex h-2 w-2">
+          <div className="hidden md:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-md border border-accent/25 bg-accent/10 text-xs text-accent shrink-0">
+            <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent" />
             </span>
-            <span className="hidden sm:inline">All systems</span>
-            <span>nominal</span>
+            <span className="hidden sm:inline font-mono uppercase tracking-wider text-[9px]">
+              all systems nominal
+            </span>
           </div>
         </div>
 
@@ -84,7 +85,9 @@ export default function TopBar() {
               className="relative p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-overlay transition-all duration-150"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-critical ring-2 ring-bg-elevated" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-critical text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-bg-elevated">
+                3
+              </span>
             </button>
             {notificationOpen && (
               <div className="absolute right-0 top-full mt-1 w-80 rounded-xl border border-border bg-bg-elevated shadow-lg py-1 z-50">

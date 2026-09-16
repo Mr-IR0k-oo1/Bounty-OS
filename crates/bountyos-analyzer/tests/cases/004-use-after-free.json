@@ -1,0 +1,11 @@
+{
+  "id": "004",
+  "name": "Use After Free",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "A",
+  "file": "use_after_free.c",
+  "vulnerable": true,
+  "cwe": "CWE-416",
+  "description": "Dereference and write to pointer after free"
+}

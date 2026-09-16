@@ -1,0 +1,11 @@
+{
+  "id": "015",
+  "name": "Missing NULL Pointer Check",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "B",
+  "file": "null_deref.c",
+  "vulnerable": true,
+  "cwe": "CWE-476",
+  "description": "Immediate array indexing on malloc return without NULL check"
+}

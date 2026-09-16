@@ -7,10 +7,11 @@ use uuid::Uuid;
 pub struct ScopeTarget {
     pub id: Uuid,
     pub program_id: Uuid,
+    pub target: String,
     pub target_type: String,
-    pub target_value: String,
-    pub in_scope: bool,
-    pub notes: Option<String>,
+    pub out_of_scope: bool,
+    pub source: Option<String>,
     pub added_by: Option<Uuid>,
-    pub added_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

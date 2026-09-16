@@ -215,7 +215,7 @@ impl FromStr for ScopeType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScanStage {
     Passive,
     Validate,
@@ -245,4 +245,83 @@ impl FromStr for ScanStage {
             _ => Err(format!("Invalid scan stage: {s}")),
         }
     }
+}
+
+impl ScanStage {
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            ScanStage::Passive => 1,
+            ScanStage::Validate => 2,
+            ScanStage::Active => 3,
+            ScanStage::Vuln => 4,
+        }
+    }
+
+    pub fn from_i32(val: i32) -> Result<Self, String> {
+        match val {
+            1 => Ok(ScanStage::Passive),
+            2 => Ok(ScanStage::Validate),
+            3 => Ok(ScanStage::Active),
+            4 => Ok(ScanStage::Vuln),
+            _ => Err(format!("Invalid scan stage: {val}")),
+        }
+    }
+}
+
+impl TryFrom<i32> for ScanStage {
+    type Error = String;
+    fn try_from(val: i32) -> Result<Self, Self::Error> {
+        Self::from_i32(val)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DetectionSource {
+    #[default]
+    Llm,
+    Rule,
+    Correlated,
+}
+
+impl fmt::Display for DetectionSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DetectionSource::Llm => write!(f, "llm"),
+            DetectionSource::Rule => write!(f, "rule"),
+            DetectionSource::Correlated => write!(f, "correlated"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ValidationStatus {
+    Confirmed,
+    #[default]
+    Candidate,
+    Rejected,
+}
+
+impl fmt::Display for ValidationStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationStatus::Confirmed => write!(f, "confirmed"),
+            ValidationStatus::Candidate => write!(f, "candidate"),
+            ValidationStatus::Rejected => write!(f, "rejected"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SecurityFinding {
+    pub vulnerability: Option<String>,
+    pub cwe: Option<String>,
+    pub severity: Option<Severity>,
+    pub confidence: f32,
+    pub evidence: String,
+    pub impact: Option<String>,
+    pub remediation: Option<String>,
+    #[serde(default)]
+    pub detection_source: DetectionSource,
+    #[serde(default)]
+    pub validation_status: ValidationStatus,
 }

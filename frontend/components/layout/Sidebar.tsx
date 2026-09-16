@@ -33,19 +33,22 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
   return (
     <div className={cn(
       "flex flex-col h-full border-r border-border bg-bg-elevated shrink-0",
-      collapsed ? "w-[56px]" : "w-full"
+      collapsed ? "w-[56px]" : "w-[220px]"
     )}>
       {/* Logo */}
       <div className={cn(
         "flex items-center h-12 border-b border-border shrink-0 relative",
-        collapsed ? "justify-center" : "gap-2.5 px-4"
+        collapsed ? "justify-center" : "gap-2.5 px-3.5"
       )}>
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shrink-0 shadow-glow-primary">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shrink-0 shadow-glow-primary ring-1 ring-inset ring-white/10">
           <Shield className="w-3.5 h-3.5 text-white" />
         </div>
         {!collapsed && (
           <>
-            <span className="font-bold text-sm tracking-tight">BountyOS</span>
+            <div className="leading-none">
+              <span className="font-bold text-sm tracking-tight">Bounty<span className="text-primary">OS</span></span>
+              <span className="block text-[9px] text-text-muted font-mono tracking-[0.18em] uppercase mt-0.5">Bug Bounty Console</span>
+            </div>
             {onClose && (
               <button
                 onClick={onClose}
@@ -62,11 +65,19 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
       <nav className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-5">
         {navGroups.map((group) => (
           <div key={group.section}>
-            {!collapsed && (
-              <div className="px-2.5 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-widest">
-                {group.section}
-              </div>
-            )}
+            <div className={cn(
+              "px-2 pb-1.5 text-[9px] font-semibold text-text-subtle uppercase tracking-[0.2em] font-mono flex items-center gap-2",
+              collapsed && "justify-center"
+            )}>
+              {collapsed ? (
+                <span className="block w-4 border-t border-border-strong" />
+              ) : (
+                <>
+                  {group.section}
+                  <span className="flex-1 h-px bg-border-subtle" />
+                </>
+              )}
+            </div>
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon
@@ -80,14 +91,14 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
                       "group flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all duration-150 relative",
                       collapsed && "justify-center px-0 mx-1",
                       active
-                        ? "bg-primary-muted text-primary font-medium"
+                        ? "bg-primary-muted text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                         : "text-text-muted hover:bg-bg-overlay hover:text-text-primary"
                     )}
                     title={collapsed ? item.label : undefined}
                   >
                     {/* Active indicator */}
                     {active && !collapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-primary" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-primary shadow-glow-primary" />
                     )}
                     <Icon className={cn("w-4 h-4 shrink-0", active && "text-primary")} />
                     {!collapsed && <span>{item.label}</span>}
@@ -105,7 +116,7 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
       </nav>
 
       {/* Bottom Links */}
-      <div className="p-2 border-t border-border space-y-0.5">
+      <div className={cn("p-2 border-t border-border space-y-0.5", collapsed && "px-2")}>
         <Link
           href="/settings"
           onClick={onClose}
@@ -148,8 +159,26 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
         </Link>
       </div>
 
+      {/* System status footer */}
+      {!collapsed && (
+        <div className="px-3 py-2.5 border-t border-border bg-bg-base/40">
+          <div className="flex items-center gap-2 text-[10px] font-mono text-text-muted">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-60" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent" />
+            </span>
+            <span className="uppercase tracking-wider">Ops</span>
+            <span className="text-text-subtle">|</span>
+            <span className="text-accent">3 active</span>
+            <span className="text-text-subtle">|</span>
+            <span>99.98%</span>
+          </div>
+          <div className="mt-1.5 ml-3.5 h-px bg-gradient-to-r from-accent/40 to-transparent" />
+        </div>
+      )}
+
       {/* Collapse toggle */}
-      <div className="px-2 py-1.5 border-t border-border">
+      <div className="px-2 py-1.5 border-t border-border/60">
         <button
           onClick={() => onToggleCollapse?.()}
           className="flex items-center justify-center w-full gap-1.5 py-1 rounded text-[10px] text-text-subtle hover:text-text-muted hover:bg-bg-overlay transition-fast"

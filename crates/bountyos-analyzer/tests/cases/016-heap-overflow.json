@@ -1,0 +1,11 @@
+{
+  "id": "016",
+  "name": "Heap Buffer Overflow",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "B",
+  "file": "heap_overflow.c",
+  "vulnerable": true,
+  "cwe": "CWE-122",
+  "description": "Unbounded string copy into 32-byte heap allocated chunk"
+}

@@ -29,12 +29,33 @@ const config: Config = {
           hover:   'var(--color-primary-hover)',
           muted:   'var(--color-primary-muted)',
           border:  'var(--color-primary-border)',
+          foreground: '#ffffff',
         },
         accent: {
           DEFAULT: 'var(--color-accent)',
           hover:   'var(--color-accent-hover)',
           muted:   'var(--color-accent-muted)',
+          foreground: '#04100d',
         },
+        // shadcn/ui aliases so shared components resolve against the design system
+        background:       'var(--color-bg-surface)',
+        foreground:       'var(--color-text-primary)',
+        card:             'var(--color-bg-elevated)',
+        'card-foreground': 'var(--color-text-primary)',
+        popover:          'var(--color-bg-elevated)',
+        'popover-foreground': 'var(--color-text-primary)',
+        muted:            'var(--color-bg-overlay)',
+        'muted-foreground': 'var(--color-text-muted)',
+        secondary:        'var(--color-bg-subtle)',
+        'secondary-foreground': 'var(--color-text-primary)',
+        destructive:      'var(--color-critical)',
+        'destructive-foreground': '#ffffff',
+        input:            'var(--color-border)',
+        ring:             'var(--color-primary)',
+        success:          'var(--color-success)',
+        warning:          'var(--color-warning)',
+        danger:           'var(--color-danger)',
+        neutral:          'var(--color-neutral)',
         severity: {
           critical: 'var(--color-critical)',
           high:     'var(--color-high)',
@@ -66,7 +87,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('tailwindcss-animate')],
 }
 
 export default config

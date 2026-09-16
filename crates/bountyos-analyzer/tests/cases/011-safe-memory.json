@@ -1,0 +1,11 @@
+{
+  "id": "011",
+  "name": "Safe Memory Management",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "C",
+  "file": "safe_memory.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "Pointer explicitly set to NULL immediately after free"
+}

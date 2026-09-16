@@ -1,0 +1,11 @@
+{
+  "id": "008",
+  "name": "Safe Bounded String Copy",
+  "language": "c",
+  "category": "memory-safety",
+  "tier": "C",
+  "file": "safe_string_copy.c",
+  "vulnerable": false,
+  "cwe": null,
+  "description": "Bounded copy using snprintf with buffer size limit"
+}

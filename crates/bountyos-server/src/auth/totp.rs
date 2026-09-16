@@ -1,7 +1,5 @@
 //! TOTP (Time-based One-Time Password) generation and verification
 
-use base32::encode;
-use std::time::{SystemTime, UNIX_EPOCH};
 use totp_rs::{Algorithm, Secret, TOTP};
 
 /// Generate a new TOTP secret and QR code URL
@@ -9,45 +7,31 @@ pub fn generate_totp_secret(
     username: &str,
     issuer: &str,
 ) -> Result<(String, String), Box<dyn std::error::Error>> {
-    // Generate a random secret
-    let secret = Secret::generate()?;
-    let secret_b32 = encode(
-        totp_rs::Base32::RFC4648 { padding: false },
-        &secret.as_bytes(),
-    );
+    let secret = Secret::generate_secret();
+    let secret_b32 = secret.to_encoded().to_string();
 
-    // Create TOTP instance
-    let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret);
+    let totp = TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret.to_bytes().map_err(|e| format!("{:?}", e))?,
+        Some(issuer.to_string()),
+        username.to_string(),
+    )
+    .map_err(|e| format!("{:?}", e))?;
 
-    // Generate QR code URL
-    let qr_code_url = format!(
-        "otpauth://totp/{}:{}:{}?secret={}&issuer={}",
-        issuer, username, issuer, secret_b32, issuer,
-    );
-
+    let qr_code_url = totp.get_url();
     Ok((secret_b32, qr_code_url))
 }
 
 /// Verify a TOTP code
 pub fn verify_totp_code(secret_b32: &str, code: &str) -> bool {
-    // Decode the secret from Base32
-    let secret_bytes = base32::decode(base32::Alphabet::RFC4648 { padding: false }, secret_b32)
-        .ok()
-        .and_then(|bytes| Secret::try_from(bytes).ok());
-
-    if let Some(secret) = secret_bytes {
-        // Create TOTP instance
-        let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret);
-
-        // Get current timestamp
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        // Verify the code
-        totp.check(code, timestamp).is_ok()
-    } else {
-        false
+    let secret = Secret::Encoded(secret_b32.to_string());
+    if let Ok(bytes) = secret.to_bytes() {
+        if let Ok(totp) = TOTP::new(Algorithm::SHA1, 6, 1, 30, bytes, None, String::new()) {
+            return totp.check_current(code).unwrap_or(false);
+        }
     }
+    false
 }

@@ -1,20 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @layer base {
   :root {
-    /* Color tokens */
-    --color-bg-base:         #0a0c14;
-    --color-bg-surface:      #0f1117;
-    --color-bg-elevated:     #161b27;
-    --color-bg-overlay:      #1e2335;
-    --color-bg-subtle:       #252a3d;
+    color-scheme: dark;
 
-    --color-border:          #2a2d3e;
-    --color-border-subtle:   #1f2232;
-    --color-border-strong:   #3d4266;
+    /* Color tokens — pure black */
+    --color-bg-base:         #000000;
+    --color-bg-surface:      #000000;
+    --color-bg-elevated:     #0a0a0a;
+    --color-bg-overlay:      #111111;
+    --color-bg-subtle:       #181818;
 
-    --color-text-primary:    #e8edf5;
-    --color-text-secondary:  #a0aabe;
-    --color-text-muted:      #6b7694;
-    --color-text-subtle:     #404868;
+    --color-border:          #1e1e1e;
+    --color-border-subtle:   #161616;
+    --color-border-strong:   #333333;
+
+    --color-text-primary:    #f5f5f5;
+    --color-text-secondary:  #a3a3a3;
+    --color-text-muted:      #737373;
+    --color-text-subtle:     #404040;
 
     --color-primary:         #7c6af7;
     --color-primary-hover:   #9580ff;
@@ -75,11 +81,39 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  body {
+    background-color: #000;
+  }
+
   * { border-color: var(--color-border); }
 
+  /* Consistent keyboard focus ring across the whole app */
+  :where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+
   ::selection {
-    background: var(--color-primary-muted);
+    background: rgba(124, 106, 247, 0.28);
     color: var(--color-text-primary);
+  }
+
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: var(--color-bg-overlay);
+    border: 1px solid var(--color-border-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    line-height: 1;
   }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -149,7 +183,7 @@
 
 @layer components {
   .card-base {
-    background: var(--color-bg-elevated);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%), var(--color-bg-elevated);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
   }
@@ -285,7 +319,7 @@
   }
 
   .glass {
-    background: rgba(22, 27, 39, 0.8);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -311,24 +345,82 @@
     border-radius: 2px;
     background: var(--color-bg-subtle);
     overflow: hidden;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
   }
   .progress-bar-fill {
     height: 100%;
     border-radius: 2px;
-    background: var(--color-primary);
-    transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
+    position: relative;
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: translateX(-100%);
+    animation: progress-sheen 2.2s ease-in-out infinite;
+  }
+  @keyframes progress-sheen {
+    0% { transform: translateX(-100%); }
+    60% { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
   }
 
   .finding-stat-card {
-    background: var(--color-bg-elevated);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%), var(--color-bg-elevated);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     padding: 16px;
-    transition: var(--transition-base);
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.02) inset;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   }
   .finding-stat-card:hover {
     border-color: var(--color-border-strong);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), 0 1px 0 0 rgba(255, 255, 255, 0.03) inset;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-primary-hover), var(--color-primary));
+    color: #fff;
+    border: 1px solid var(--color-primary-border);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, var(--shadow-sm);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.06);
+  }
+  .btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .kbd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  /* Decorative faint grid used behind terminal / data panels */
+  .tech-grid {
+    background-image:
+      linear-gradient(rgba(124, 106, 247, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 106, 247, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Mono tabular numerals for data readouts */
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   .modal-overlay {
