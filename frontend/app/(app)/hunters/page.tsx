@@ -4,7 +4,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Shield, Plus, CheckCircle2, XCircle, MoreHorizontal } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { 
+  Shield, Plus, CheckCircle2, XCircle, MoreHorizontal, 
+  UserCheck, UserX, Edit3, Trash2, X, KeyRound
+} from "lucide-react"
+import { useToast } from "@/hooks/useToast"
+import { cn } from "@/lib/utils"
 
 type Hunter = {
   id: string
@@ -17,7 +23,7 @@ type Hunter = {
 }
 
 const initialHunters: Hunter[] = [
-  { id: "h1", username: "admin", displayName: "Admin User", role: "admin", twoFactor: true, lastLogin: "2m ago", active: true },
+  { id: "h1", username: "admin", displayName: "Admin User", role: "admin", twoFactor: true, lastLogin: "Just now", active: true },
   { id: "h2", username: "hunter1", displayName: "Alice Smith", role: "hunter", twoFactor: true, lastLogin: "15m ago", active: true },
   { id: "h3", username: "hunter2", displayName: "Bob Jones", role: "hunter", twoFactor: false, lastLogin: "1h ago", active: true },
   { id: "h4", username: "hunter3", displayName: "Carol White", role: "hunter", twoFactor: true, lastLogin: "1d ago", active: true },
@@ -25,79 +31,174 @@ const initialHunters: Hunter[] = [
 ]
 
 const roleColors: Record<string, string> = {
-  admin: "bg-severity-high/10 text-severity-high",
-  hunter: "bg-primary-muted text-primary",
-  viewer: "bg-bg-subtle text-text-muted",
+  admin: "bg-critical-muted text-critical border border-critical/20",
+  hunter: "bg-primary-muted text-primary border border-primary/20",
+  viewer: "bg-bg-subtle text-text-muted border border-border",
 }
 
 export default function HuntersPage() {
-  const [hunters, setHunters] = useState(initialHunters)
+  const { toast } = useToast()
+  const [hunters, setHunters] = useState<Hunter[]>(initialHunters)
   const [showAdd, setShowAdd] = useState(false)
+  const [editingHunter, setEditingHunter] = useState<Hunter | null>(null)
+
+  // Add Hunter Form
+  const [addUsername, setAddUsername] = useState("")
+  const [addDisplayName, setAddDisplayName] = useState("")
+  const [addRole, setAddRole] = useState<"admin" | "hunter" | "viewer">("hunter")
 
   function toggleActive(id: string) {
-    setHunters((prev) => prev.map((h) => (h.id === id ? { ...h, active: !h.active } : h)))
+    setHunters((prev) =>
+      prev.map((h) => {
+        if (h.id === id) {
+          const updatedActive = !h.active
+          toast({
+            title: updatedActive ? "Hunter Activated" : "Hunter Deactivated",
+            description: `${h.displayName} (${h.username}) is now ${updatedActive ? "active" : "inactive"}.`
+          })
+          return { ...h, active: updatedActive }
+        }
+        return h
+      })
+    )
+  }
+
+  function handleCreateHunter(e: React.FormEvent) {
+    e.preventDefault()
+    if (!addUsername.trim() || !addDisplayName.trim()) return
+
+    const newHunter: Hunter = {
+      id: `h-${Date.now()}`,
+      username: addUsername.trim().toLowerCase(),
+      displayName: addDisplayName.trim(),
+      role: addRole,
+      twoFactor: false,
+      lastLogin: "Never",
+      active: true
+    }
+
+    setHunters((prev) => [newHunter, ...prev])
+    setAddUsername("")
+    setAddDisplayName("")
+    setShowAdd(false)
+    toast({
+      title: "Hunter Created",
+      description: `${newHunter.displayName} added with role ${newHunter.role}. Invitation link generated.`
+    })
+  }
+
+  function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingHunter) return
+
+    setHunters((prev) => prev.map((h) => (h.id === editingHunter.id ? editingHunter : h)))
+    toast({ title: "Hunter Updated", description: `Saved details for ${editingHunter.displayName}.` })
+    setEditingHunter(null)
+  }
+
+  function handleDeleteHunter(id: string) {
+    const target = hunters.find((h) => h.id === id)
+    if (!target) return
+    setHunters((prev) => prev.filter((h) => h.id !== id))
+    toast({ title: "Hunter Removed", description: `${target.displayName} was removed from the system.` })
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Shield className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-text-primary">Hunters</h1>
-          <span className="text-sm text-text-muted">{hunters.length} total</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold text-text-primary">Team & Hunters</h1>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary-muted text-primary">
+              {hunters.length} members
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mt-1">Manage operators, permissions, and multi-factor authentication.</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Add Hunter
+
+        <Button
+          onClick={() => setShowAdd(true)}
+          className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 shadow-glow-primary self-start sm:self-auto"
+          size="sm"
+        >
+          <Plus className="w-3.5 h-3.5" /> Add New Hunter
         </Button>
       </div>
 
-      <Card className="bg-bg-elevated border border-border overflow-hidden">
+      <Card className="bg-bg-elevated border border-border overflow-hidden shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-bg-subtle text-text-muted uppercase text-xs">
-            <tr>
+          <thead>
+            <tr className="table-header border-b border-border bg-bg-subtle/50 text-[10px] font-bold text-text-muted uppercase tracking-wider">
               <th className="px-4 py-3 text-left">Username</th>
               <th className="px-4 py-3 text-left">Display Name</th>
               <th className="px-4 py-3 text-left">Role</th>
-              <th className="px-4 py-3 text-left">2FA</th>
+              <th className="px-4 py-3 text-left">2FA Status</th>
               <th className="px-4 py-3 text-left">Last Login</th>
               <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3" />
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border/60">
             {hunters.map((h) => (
-              <tr key={h.id} className="hover:bg-bg-overlay">
-                <td className="px-4 py-3 font-mono text-xs text-text-primary">{h.username}</td>
-                <td className="px-4 py-3 text-text-secondary">{h.displayName}</td>
-                <td className="px-4 py-3">
-                  <span className={`badge text-xs capitalize ${roleColors[h.role]}`}>{h.role}</span>
+              <tr key={h.id} className="hover:bg-bg-overlay/50 transition-colors">
+                <td className="px-4 py-3.5 font-mono text-xs text-text-primary font-medium">
+                  {h.username}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5 text-xs text-text-secondary">{h.displayName}</td>
+                <td className="px-4 py-3.5">
+                  <span className={`badge text-[10px] font-bold uppercase tracking-wider ${roleColors[h.role]}`}>
+                    {h.role}
+                  </span>
+                </td>
+                <td className="px-4 py-3.5">
                   {h.twoFactor ? (
-                    <CheckCircle2 className="w-4 h-4 text-accent" />
+                    <span className="inline-flex items-center gap-1.5 text-xs text-low font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-low" /> Enforced
+                    </span>
                   ) : (
-                    <XCircle className="w-4 h-4 text-text-muted" />
+                    <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+                      <XCircle className="w-4 h-4 text-text-subtle" /> Not configured
+                    </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-text-muted">{h.lastLogin}</td>
-                <td className="px-4 py-3">
-                  <span className={`flex items-center gap-1.5 text-xs ${h.active ? "text-accent" : "text-text-muted"}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${h.active ? "bg-accent" : "bg-text-subtle"}`} />
+                <td className="px-4 py-3.5 text-xs text-text-muted">{h.lastLogin}</td>
+                <td className="px-4 py-3.5">
+                  <span className={cn(
+                    "badge text-[10px] font-semibold flex items-center gap-1.5 w-fit",
+                    h.active ? "bg-low-muted text-low border border-low/20" : "bg-bg-subtle text-text-muted border border-border"
+                  )}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full", h.active ? "bg-low" : "bg-text-muted")} />
                     {h.active ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => toggleActive(h.id)}>
+                <td className="px-4 py-3.5 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleActive(h.id)}
+                      className="text-xs border-border bg-bg-subtle hover:bg-bg-overlay h-7 px-2"
+                    >
                       {h.active ? "Deactivate" : "Activate"}
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      Edit
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingHunter(h)}
+                      className="text-xs border-border bg-bg-subtle hover:bg-bg-overlay h-7 px-2"
+                    >
+                      <Edit3 className="w-3 h-3" />
                     </Button>
-                    <button className="text-text-muted hover:text-text-primary">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    {h.username !== "admin" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteHunter(h.id)}
+                        className="text-xs border-critical/30 text-critical hover:bg-critical-muted h-7 px-2"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -106,39 +207,128 @@ export default function HuntersPage() {
         </table>
       </Card>
 
+      {/* Add Hunter Modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowAdd(false)}>
-          <Card className="w-full max-w-md p-6 bg-bg-elevated border border-border" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-text-primary mb-4">Add Hunter</h2>
-            <div className="space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <Card className="w-full max-w-md bg-bg-elevated border border-border shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-semibold text-text-primary">Add Team Member</h3>
+              </div>
+              <button onClick={() => setShowAdd(false)} className="p-1 rounded-lg text-text-muted hover:text-text-primary">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateHunter} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm text-text-secondary">Username</label>
-                <Input placeholder="Choose a username" />
+                <Label className="text-xs text-text-secondary">Username</Label>
+                <Input
+                  value={addUsername}
+                  onChange={(e) => setAddUsername(e.target.value)}
+                  placeholder="e.g. jdoe"
+                  className="bg-bg-subtle border-border text-xs"
+                  required
+                />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm text-text-secondary">Display Name</label>
-                <Input placeholder="Full name" />
+                <Label className="text-xs text-text-secondary">Full Display Name</Label>
+                <Input
+                  value={addDisplayName}
+                  onChange={(e) => setAddDisplayName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="bg-bg-subtle border-border text-xs"
+                  required
+                />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm text-text-secondary">Role</label>
-                <select className="input-base h-9 w-full rounded-md border border-border bg-bg-elevated px-3 text-sm">
+                <Label className="text-xs text-text-secondary">Role Permission</Label>
+                <select
+                  value={addRole}
+                  onChange={(e) => setAddRole(e.target.value as any)}
+                  className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-text-primary"
+                >
+                  <option value="hunter">Hunter (Scan, triage findings, write reports)</option>
+                  <option value="viewer">Viewer (Read-only findings & recon)</option>
+                  <option value="admin">Admin (Full system access & settings)</option>
+                </select>
+              </div>
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-text-secondary">
+                A temporary credential will be created. The hunter will be required to set up TOTP two-factor authentication upon first login.
+              </div>
+              <div className="flex gap-2 justify-end pt-3 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdd(false)} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
+                  Create Hunter
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Hunter Modal */}
+      {editingHunter && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <Card className="w-full max-w-md bg-bg-elevated border border-border shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-semibold text-text-primary">Edit Member</h3>
+              </div>
+              <button onClick={() => setEditingHunter(null)} className="p-1 rounded-lg text-text-muted hover:text-text-primary">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-secondary">Display Name</Label>
+                <Input
+                  value={editingHunter.displayName}
+                  onChange={(e) => setEditingHunter({ ...editingHunter, displayName: e.target.value })}
+                  className="bg-bg-subtle border-border text-xs"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-secondary">Role</Label>
+                <select
+                  value={editingHunter.role}
+                  onChange={(e) => setEditingHunter({ ...editingHunter, role: e.target.value as any })}
+                  className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-text-primary"
+                >
                   <option value="hunter">Hunter</option>
                   <option value="viewer">Viewer</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm text-text-secondary">Temporary Password</label>
-                <Input placeholder="Auto-generated" disabled />
+              <div className="flex items-center justify-between p-3 rounded-xl bg-bg-subtle border border-border">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-text-primary">Enforce Two-Factor Auth</div>
+                  <div className="text-[11px] text-text-muted">Require TOTP authenticator app</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={editingHunter.twoFactor}
+                  onChange={(e) => setEditingHunter({ ...editingHunter, twoFactor: e.target.checked })}
+                  className="rounded border-border text-primary"
+                />
               </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-                <Button>Add Hunter</Button>
+              <div className="flex gap-2 justify-end pt-3 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditingHunter(null)} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
+                  Save Changes
+                </Button>
               </div>
-            </div>
+            </form>
           </Card>
         </div>
       )}
     </div>
   )
 }
+

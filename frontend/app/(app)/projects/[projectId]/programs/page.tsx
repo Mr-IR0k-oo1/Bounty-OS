@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Plus, Globe, Clock } from "lucide-react"
 import Link from "next/link"
+import { ProgramForm } from "@/components/programs/ProgramForm"
 
-const programs = [
+const initialPrograms = [
   { id: "1", name: "Uber", platform: "HackerOne", status: "active", targets: 142, lastScan: "2m ago" },
   { id: "2", name: "Airbnb", platform: "Bugcrowd", status: "active", targets: 89, lastScan: "15m ago" },
   { id: "3", name: "Twitter", platform: "HackerOne", status: "active", targets: 203, lastScan: "1h ago" },
@@ -16,6 +17,21 @@ const programs = [
 export default function ProjectProgramsPage() {
   const params = useParams()
   const projectId = params.projectId as string
+  const [programs, setPrograms] = useState(initialPrograms)
+  const [showAdd, setShowAdd] = useState(false)
+
+  const handleAddSubmit = async (data: any) => {
+    const newProg = {
+      id: String(Date.now()),
+      name: data.name,
+      platform: data.platform === "h1" ? "HackerOne" : data.platform === "bugcrowd" ? "Bugcrowd" : data.platform === "intigriti" ? "Intigriti" : "Other",
+      status: "active",
+      targets: 0,
+      lastScan: "Just now",
+    }
+    setPrograms([newProg, ...programs])
+    setShowAdd(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -27,9 +43,9 @@ export default function ProjectProgramsPage() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-text-primary">
-          Programs <span className="text-sm font-normal text-text-muted">3 in this project</span>
+          Programs <span className="text-sm font-normal text-text-muted">{programs.length} in this project</span>
         </h1>
-        <Button className="btn-primary flex items-center gap-2">
+        <Button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add Program
         </Button>
@@ -54,6 +70,14 @@ export default function ProjectProgramsPage() {
           </Link>
         ))}
       </div>
+
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowAdd(false)}>
+          <div className="relative w-full max-w-lg rounded-2xl border border-border bg-bg-elevated shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <ProgramForm onSubmit={handleAddSubmit} onCancel={() => setShowAdd(false)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

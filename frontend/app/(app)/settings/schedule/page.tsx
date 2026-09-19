@@ -4,9 +4,10 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Clock, SlidersHorizontal, Moon, Sun } from "lucide-react"
+import { Clock, SlidersHorizontal, Moon, Sun, Save, Check, RotateCcw } from "lucide-react"
+import { useToast } from "@/hooks/useToast"
 
-const programs = [
+const defaultPrograms = [
   { id: "p1", name: "Uber", interval: 24, override: true },
   { id: "p2", name: "Airbnb", interval: 48, override: false },
   { id: "p3", name: "Twitter", interval: 12, override: true },
@@ -15,10 +16,12 @@ const programs = [
 ]
 
 export default function ScheduleSettingsPage() {
+  const { toast } = useToast()
   const [globalInterval, setGlobalInterval] = useState(24)
   const [quietStart, setQuietStart] = useState("22:00")
   const [quietEnd, setQuietEnd] = useState("07:00")
-  const [programOverrides, setProgramOverrides] = useState(programs)
+  const [programOverrides, setProgramOverrides] = useState(defaultPrograms)
+  const [isSaved, setIsSaved] = useState(false)
 
   function toggleOverride(id: string) {
     setProgramOverrides((prev) => prev.map((p) => (p.id === id ? { ...p, override: !p.override } : p)))
@@ -28,13 +31,54 @@ export default function ScheduleSettingsPage() {
     setProgramOverrides((prev) => prev.map((p) => (p.id === id ? { ...p, interval } : p)))
   }
 
+  function handleSave() {
+    setIsSaved(true)
+    setTimeout(() => setIsSaved(false), 2000)
+    toast({
+      title: "Schedule Saved",
+      description: `Global rescan: ${globalInterval}h. Quiet hours: ${quietStart} - ${quietEnd}. ${programOverrides.filter(p => p.override).length} overrides active.`,
+    })
+  }
+
+  function handleReset() {
+    setGlobalInterval(24)
+    setQuietStart("22:00")
+    setQuietEnd("07:00")
+    setProgramOverrides(defaultPrograms)
+    toast({
+      title: "Schedule Reset",
+      description: "Default cron schedules and quiet hours restored.",
+    })
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <div className="text-sm text-text-muted mb-1">
-          <a href="/settings" className="hover:text-text-primary">Settings</a> / Schedule
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm text-text-muted mb-1">
+            <a href="/settings" className="hover:text-text-primary">Settings</a> / Schedule
+          </div>
+          <h1 className="text-2xl font-bold text-text-primary">Scan Schedule</h1>
         </div>
-        <h1 className="text-2xl font-bold text-text-primary">Scan Schedule</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleReset} className="border-border text-text-muted hover:text-text-primary">
+            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+            Reset Defaults
+          </Button>
+          <Button size="sm" onClick={handleSave} className="bg-primary hover:bg-primary-hover text-bg font-semibold">
+            {isSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-1.5 text-bg" />
+                Saved
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-1.5" />
+                Save Schedule
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-bg-elevated border border-border p-5">

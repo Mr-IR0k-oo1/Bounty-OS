@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { ShieldAlert, Eye, EyeOff } from "lucide-react"
+import { ShieldAlert, Eye, EyeOff, Sparkles } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
+  const { login } = useAuth()
+  const [username, setUsername] = useState("admin")
+  const [password, setPassword] = useState("password123")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -21,31 +23,24 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.message || "Login failed")
-        return
-      }
-
-      if (data.requires_2fa) {
+      const res = await login(username, password)
+      if (res.requires_2fa) {
         router.push("/2fa")
         return
       }
-
-      localStorage.setItem("token", data.token)
       router.push("/dashboard")
     } catch {
-      setError("Network error. Please try again.")
+      setError("Unable to authenticate. Please check your credentials.")
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleDemoLogin() {
+    setLoading(true)
+    login("admin", "admin").then(() => {
+      router.push("/dashboard")
+    })
   }
 
   return (
@@ -106,6 +101,28 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in to BountyOS"}
           </Button>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-border"></div>
+            <span className="flex-shrink mx-3 text-xs text-text-muted">or</span>
+            <div className="flex-grow border-t border-border"></div>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDemoLogin}
+            disabled={loading}
+            className="w-full border border-border text-xs flex items-center justify-center gap-1.5 hover:bg-bg-overlay text-text-secondary"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-primary" /> Instant Demo Sign-In
+          </Button>
+
+          <div className="text-center pt-2">
+            <a href="/setup" className="text-xs text-text-muted hover:text-primary transition-colors">
+              First time setup wizard →
+            </a>
+          </div>
         </form>
       </Card>
     </div>

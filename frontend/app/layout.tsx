@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NewThemeProvider as ThemeProvider } from "@/components/layout/NewThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/hooks/useAuth";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,8 +22,10 @@ export default function RootLayout({
           forcedTheme="dark"
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

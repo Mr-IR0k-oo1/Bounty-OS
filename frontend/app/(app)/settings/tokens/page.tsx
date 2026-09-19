@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Key, Plus, Copy, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react"
+import { useToast } from "@/hooks/useToast"
 
 type ApiToken = {
   id: string
@@ -22,6 +23,7 @@ const initialTokens: ApiToken[] = [
 ]
 
 export default function TokensSettingsPage() {
+  const { toast } = useToast()
   const [tokens, setTokens] = useState(initialTokens)
   const [showGenerate, setShowGenerate] = useState(false)
   const [newTokenName, setNewTokenName] = useState("")
@@ -32,6 +34,17 @@ export default function TokensSettingsPage() {
   function generateToken() {
     const fakeToken = "bos_" + Array.from({ length: 48 }, () => Math.random().toString(36)[2]).join("")
     setGeneratedToken(fakeToken)
+
+    const newTokenItem: ApiToken = {
+      id: "t" + Date.now(),
+      name: newTokenName || "API Token",
+      created: "Today",
+      lastUsed: "Never",
+      expires: "1 Year",
+      active: true
+    }
+    setTokens(prev => [newTokenItem, ...prev])
+    toast({ title: "Token Generated", description: `API token "${newTokenItem.name}" is now active.` })
   }
 
   function copyToken() {
@@ -39,11 +52,14 @@ export default function TokensSettingsPage() {
       navigator.clipboard.writeText(generatedToken)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+      toast({ title: "Copied", description: "API token copied to clipboard." })
     }
   }
 
   function revokeToken(id: string) {
-    setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, active: !t.active } : t)))
+    const token = tokens.find(t => t.id === id)
+    setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, active: false } : t)))
+    toast({ title: "Token Revoked", description: `Token "${token?.name || id}" has been revoked.` })
   }
 
   function closeGenerator() {

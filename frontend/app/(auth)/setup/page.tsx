@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { ShieldAlert, Check, Copy, ArrowRight } from "lucide-react"
+import { setTokens } from "@/lib/auth"
 
 type SetupStep = "account" | "2fa" | "done"
 
@@ -81,7 +82,7 @@ export default function SetupPage() {
   }
 
   function handleFinish() {
-    localStorage.setItem("token", "setup-token")
+    setTokens("setup-token", "setup-refresh-token")
     router.push("/dashboard")
   }
 

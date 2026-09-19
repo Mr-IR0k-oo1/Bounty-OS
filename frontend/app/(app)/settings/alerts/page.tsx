@@ -4,14 +4,16 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Bell, MessageCircle, Mail, Send, CheckCircle2 } from "lucide-react"
+import { Bell, MessageCircle, Mail, Send, CheckCircle2, Save } from "lucide-react"
+import { useToast } from "@/hooks/useToast"
 
 const severities = ["critical", "high", "medium", "low", "info"] as const
 
 export default function AlertsSettingsPage() {
+  const { toast } = useToast()
   const [discordUrls, setDiscordUrls] = useState<Record<string, string>>({
-    critical: "https://discord.com/api/webhooks/.../critical",
-    high: "https://discord.com/api/webhooks/.../high",
+    critical: "https://discord.com/api/webhooks/12345/critical-vulns",
+    high: "https://discord.com/api/webhooks/12345/high-vulns",
     medium: "",
     low: "",
     info: "",
@@ -34,16 +36,39 @@ export default function AlertsSettingsPage() {
 
   function testAlert(channel: string) {
     setTested(channel)
-    setTimeout(() => setTested(null), 2000)
+    setTimeout(() => {
+      setTested(null)
+      toast({
+        title: "Webhook Test Sent",
+        description: `Successfully dispatched test notification to ${channel.replace("-", " ")}.`,
+      })
+    }, 600)
+  }
+
+  function handleSaveAll() {
+    toast({
+      title: "Alert Settings Saved",
+      description: "Webhook endpoints and notification rules updated.",
+    })
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="text-sm text-text-muted mb-1">
-          <a href="/settings" className="hover:text-text-primary">Settings</a> / Alerts
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="text-xs text-text-muted mb-1">
+            <a href="/settings" className="hover:text-text-primary transition-colors">Settings</a> / Alerts
+          </div>
+          <h1 className="text-xl font-bold text-text-primary">Alert Configuration</h1>
+          <p className="text-xs text-text-muted mt-0.5">Route critical vulnerability findings directly to team chat channels.</p>
         </div>
-        <h1 className="text-2xl font-bold text-text-primary">Alert Configuration</h1>
+        <Button
+          onClick={handleSaveAll}
+          size="sm"
+          className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 self-start sm:self-auto"
+        >
+          <Save className="w-3.5 h-3.5" /> Save Webhook Settings
+        </Button>
       </div>
 
       <Card className="bg-bg-elevated border border-border p-5">
