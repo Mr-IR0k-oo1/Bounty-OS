@@ -32,7 +32,7 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
 
   return (
     <div className={cn(
-      "flex flex-col h-full border-r border-border bg-bg-elevated shrink-0",
+      "flex flex-col h-full border-r border-border bg-bg-elevated shrink-0 select-none transition-all duration-200",
       collapsed ? "w-[56px]" : "w-[220px]"
     )}>
       {/* Logo */}
@@ -61,8 +61,8 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-5">
+      {/* Navigation - No scroll */}
+      <nav className="flex-1 overflow-hidden p-2 space-y-3">
         {navGroups.map((group) => (
           <div key={group.section}>
             <div className={cn(
@@ -178,15 +178,21 @@ export default function Sidebar({ collapsed = false, onClose, onToggleCollapse }
       )}
 
       {/* Collapse toggle */}
-      <div className="px-2 py-1.5 border-t border-border/60">
+      <div className="px-2 py-2 border-t border-border/60">
         <button
-          onClick={() => onToggleCollapse?.()}
-          className="flex items-center justify-center w-full gap-1.5 py-1 rounded text-[10px] text-text-subtle hover:text-text-muted hover:bg-bg-overlay transition-fast"
+          onClick={(e) => {
+            e.preventDefault()
+            onToggleCollapse?.()
+          }}
+          className={cn(
+            "flex items-center justify-center w-full gap-2 py-1.5 rounded-md text-xs text-text-muted hover:text-text-primary hover:bg-bg-overlay transition-all cursor-pointer",
+            collapsed ? "px-1" : "px-2.5"
+          )}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <PanelLeft className={cn("w-3 h-3 transition-transform duration-200", collapsed && "rotate-180")} />
-          {!collapsed && <span>Collapse</span>}
-          {collapsed && <span className="sr-only">Expand</span>}
+          <PanelLeft className={cn("w-4 h-4 text-primary transition-transform duration-200 shrink-0", collapsed && "rotate-180")} />
+          {!collapsed && <span className="text-xs font-medium text-text-secondary">Collapse</span>}
         </button>
       </div>
     </div>

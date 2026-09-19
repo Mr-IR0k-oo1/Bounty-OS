@@ -93,8 +93,8 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-base">
-      <Card className="w-full max-w-md p-8 bg-bg-elevated border border-border">
+    <div className="min-h-screen flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <Card className="w-full max-w-md p-8 bg-bg-elevated/90 backdrop-blur-xl border border-border/80 shadow-2xl">
         <div className="flex flex-col items-center mb-8">
           <ShieldAlert className="w-10 h-10 text-primary mb-3" />
           <h1 className="text-xl font-bold text-text-primary">BountyOS Setup</h1>

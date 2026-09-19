@@ -82,7 +82,13 @@
   }
 
   body {
-    background-color: #000;
+    background-color: #07090e;
+    background-image: url('/bg.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
   }
 
   * { border-color: var(--color-border); }

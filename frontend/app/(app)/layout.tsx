@@ -12,17 +12,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [assistantWidth, setAssistantWidth] = useState(320)
 
+  // Load saved sidebar state from localStorage so it stays collapsed across page changes & reloads
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("bountyos_sidebar_open")
+      if (saved !== null) {
+        setSidebarOpen(saved === "true")
+      }
+    } catch {
+      // Ignore storage errors in restricted contexts
+    }
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem("bountyos_sidebar_open", String(next))
+      } catch {
+        // Ignore storage errors
+      }
+      return next
+    })
+  }, [])
+
   // Ctrl+B to toggle sidebar
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "b") {
         e.preventDefault()
-        setSidebarOpen((prev) => !prev)
+        toggleSidebar()
       }
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [])
+  }, [toggleSidebar])
 
   const handleAssistantResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -47,10 +71,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [assistantWidth])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-surface text-text-primary">
+    <div className="flex h-screen overflow-hidden bg-bg-surface/80 backdrop-blur-[1.5px] text-text-primary">
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex shrink-0">
-        <Sidebar collapsed={!sidebarOpen} onToggleCollapse={() => setSidebarOpen(!sidebarOpen)} />
+        <Sidebar collapsed={!sidebarOpen} onToggleCollapse={toggleSidebar} />
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -77,7 +101,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={toggleSidebar}
             className="hidden lg:flex p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-overlay transition-fast"
             title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
