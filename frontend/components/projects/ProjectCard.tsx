@@ -62,7 +62,7 @@ export function ProjectCard({
         </div>
 
         <Link
-          href={`/projects/${project.slug}/kanban`}
+          href={`/projects/${project.slug}`}
           className="flex w-full items-center justify-center border-2 border-primary bg-primary text-primary-foreground px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:bg-transparent hover:text-primary"
         >
           Access Command Center

@@ -3,14 +3,11 @@
 import { useState, useCallback, useEffect } from "react"
 import Sidebar from "@/components/layout/Sidebar"
 import TopBar from "@/components/layout/TopBar"
-import AssistantPanel from "@/components/layout/AssistantPanel"
-import { PanelRight, PanelRightClose, Menu } from "lucide-react"
+import { Menu } from "lucide-react"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [assistantOpen, setAssistantOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [assistantWidth, setAssistantWidth] = useState(320)
 
   // Load saved sidebar state from localStorage so it stays collapsed across page changes & reloads
   useEffect(() => {
@@ -47,28 +44,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
   }, [toggleSidebar])
-
-  const handleAssistantResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startWidth = assistantWidth
-
-    const onMove = (ev: MouseEvent) => {
-      const delta = startX - ev.clientX
-      const newWidth = Math.min(Math.max(startWidth + delta, 280), 480)
-      setAssistantWidth(newWidth)
-    }
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove)
-      document.removeEventListener("mouseup", onUp)
-      document.body.style.cursor = ""
-      document.body.style.userSelect = ""
-    }
-    document.addEventListener("mousemove", onMove)
-    document.addEventListener("mouseup", onUp)
-    document.body.style.cursor = "col-resize"
-    document.body.style.userSelect = "none"
-  }, [assistantWidth])
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-surface/80 backdrop-blur-[1.5px] text-text-primary">
@@ -117,32 +92,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </main>
-
-      {/* Assistant Panel */}
-      <div
-        className={`hidden xl:flex flex-col border-l border-border bg-bg-elevated overflow-hidden transition-all duration-300 ease-in-out shrink-0 ${
-          assistantOpen ? "" : "w-0"
-        }`}
-        style={{ width: assistantOpen ? assistantWidth : 0 }}
-      >
-        {assistantOpen && (
-          <>
-            <div
-              className="w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors shrink-0 absolute left-0 top-0 bottom-0 z-10"
-              onMouseDown={handleAssistantResize}
-            />
-            <AssistantPanel onClose={() => setAssistantOpen(false)} />
-          </>
-        )}
-      </div>
-
-      {/* Mobile Assistant Toggle */}
-      <button
-        onClick={() => setAssistantOpen(!assistantOpen)}
-        className="fixed bottom-4 right-4 z-30 xl:hidden p-3 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95"
-      >
-        {assistantOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRight className="w-4 h-4" />}
-      </button>
     </div>
   )
 }

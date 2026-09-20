@@ -346,7 +346,7 @@ export default function FindingsPage() {
             ))}
             {search && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-primary-muted text-primary">
-                "{search}"
+                &quot;{search}&quot;
                 <X className="w-2.5 h-2.5 cursor-pointer hover:opacity-75" onClick={() => setSearch("")} />
               </span>
             )}

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -44,6 +45,8 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.1.0",
     "@types/bun": "latest",
     "@types/node": "^20",
     "@types/react": "^18",
@@ -53,6 +56,5 @@
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
   },
-  "module": "src/index.ts",
   "type": "module"
 }

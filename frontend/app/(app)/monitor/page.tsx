@@ -24,6 +24,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  WifiOff,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -118,19 +119,18 @@ export default function MonitorPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"live" | "watchlist" | "telemetry" | "terminal">("live")
   const [isStreaming, setIsStreaming] = useState(true)
+  const [isConnecting, setIsConnecting] = useState(true)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
   const [events, setEvents] = useState<MonitorEvent[]>(initialEvents)
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null)
 
-  // Periodic simulation of live polling pulse
+  // Simulated initial feed connection (mock only — no backend or WebSocket involved)
   useEffect(() => {
-    if (!isStreaming) return
-    const timer = setInterval(() => {
-      // Optional subtle heartbeat
-    }, 15000)
-    return () => clearInterval(timer)
-  }, [isStreaming])
+    const timer = setTimeout(() => setIsConnecting(false), 900)
+    return () => clearTimeout(timer)
+  }, [])
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
@@ -153,6 +153,17 @@ export default function MonitorPage() {
       title: "Polling triggers dispatched",
       description: "Triggered active DNS diff and HTTP status probe across 1,428 hosts.",
     })
+  }
+
+  const handleSimulateOutage = () => {
+    setIsStreaming(false)
+    setFeedError("Monitor stream stopped receiving change events — 3 consecutive polling cycles timed out.")
+  }
+
+  const handleReconnect = () => {
+    setFeedError(null)
+    setIsStreaming(true)
+    toast({ title: "Reconnected", description: "Monitor feed resumed." })
   }
 
   const handleCopy = (text: string, id: string) => {
@@ -320,6 +331,14 @@ export default function MonitorPage() {
               <option value="low">Low</option>
               <option value="info">Info</option>
             </select>
+            <button
+              onClick={handleSimulateOutage}
+              title="Simulate feed outage"
+              aria-label="Simulate feed outage"
+              className="h-8 px-2.5 rounded-md border border-border bg-bg-elevated text-text-muted hover:text-critical hover:border-critical/40 transition-colors"
+            >
+              <WifiOff className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
       </div>
@@ -327,7 +346,44 @@ export default function MonitorPage() {
       {/* TAB 1: LIVE CHANGE FEED */}
       {activeTab === "live" && (
         <div className="space-y-3">
-          {filteredEvents.map((event) => {
+          {feedError ? (
+            <Card className="p-10 text-center bg-bg-elevated border border-border">
+              <AlertTriangle className="w-10 h-10 text-severity-critical mx-auto mb-2 opacity-80" />
+              <h3 className="text-sm font-semibold text-text-primary">Monitor feed disconnected</h3>
+              <p className="text-xs text-text-muted mt-1 max-w-md mx-auto">{feedError}</p>
+              <Button size="sm" className="mt-4 text-xs" onClick={handleReconnect}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Reconnect
+              </Button>
+            </Card>
+          ) : isConnecting ? (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <Card key={i} className="p-4 bg-bg-elevated border border-border">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="skeleton h-4 w-16 rounded" />
+                      <div className="skeleton h-4 w-20 rounded" />
+                      <div className="skeleton h-4 w-36 rounded" />
+                    </div>
+                    <div className="skeleton h-3 w-16 rounded" />
+                  </div>
+                  <div className="skeleton h-4 w-3/4 rounded mb-2" />
+                  <div className="skeleton h-8 w-full rounded" />
+                </Card>
+              ))}
+              <div className="flex items-center justify-center gap-2 text-[11px] text-text-muted font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                Connecting to monitor feed&hellip;
+              </div>
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            <Card className="p-12 text-center bg-bg-elevated border border-border">
+              <CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2 opacity-60" />
+              <h3 className="text-sm font-semibold text-text-primary">All hosts quiet</h3>
+              <p className="text-xs text-text-muted mt-1">No matching change events detected in the active window.</p>
+            </Card>
+          ) : (
+            filteredEvents.map((event) => {
             const severityColors = {
               critical: "bg-critical/15 text-critical border-critical/30",
               high: "bg-high/15 text-high border-high/30",
@@ -388,14 +444,7 @@ export default function MonitorPage() {
                 </div>
               </Card>
             )
-          })}
-
-          {filteredEvents.length === 0 && (
-            <Card className="p-12 text-center bg-bg-elevated border border-border">
-              <CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2 opacity-60" />
-              <h3 className="text-sm font-semibold text-text-primary">All hosts quiet</h3>
-              <p className="text-xs text-text-muted mt-1">No matching change events detected in the active window.</p>
-            </Card>
+            })
           )}
         </div>
       )}
@@ -410,6 +459,7 @@ export default function MonitorPage() {
             <span className="text-xs font-mono text-text-muted">{watchlistHosts.length} hosts flagged</span>
           </div>
 
+          <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-bg-base/50 text-text-muted uppercase border-b border-border">
               <tr>
@@ -463,6 +513,7 @@ export default function MonitorPage() {
               ))}
             </tbody>
           </table>
+        </div>
         </Card>
       )}
 
