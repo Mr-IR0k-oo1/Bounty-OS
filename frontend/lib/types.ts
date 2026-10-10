@@ -1,6 +1,6 @@
 export type Severity   = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export type Platform   = 'h1' | 'bugcrowd' | 'intigriti' | 'synack' | 'other'
-export type JobStatus  = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
+export type JobStatus  = 'queued' | 'running' | 'done' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out'
 export type ScopeType  = 'domain' | 'ip' | 'cidr' | 'wildcard' | 'apk' | 'url'
 export type FindingStatus =
   'new' | 'triaged' | 'validated' | 'submitted' | 'fp' | 'dup' | 'na' | 'bounty_awarded'
@@ -18,14 +18,20 @@ export interface Hunter {
 
 export interface Project {
   id: string
-  slug: string
+  slug?: string
   name: string
   description: string | null
-  status: 'active' | 'archived'
-  startDate: string | null
-  endDate: string | null
-  createdBy: Hunter
-  createdAt: string
+  active?: boolean
+  status?: 'active' | 'archived'
+  startDate?: string | null
+  start_date?: string | null
+  endDate?: string | null
+  end_date?: string | null
+  createdBy?: Hunter | string | null
+  created_by?: string | null
+  createdAt?: string
+  created_at?: string
+  updated_at?: string
   stats?: ProjectStats
 }
 
@@ -39,20 +45,31 @@ export interface ProjectStats {
 
 export interface Program {
   id: string
-  projectId: string
+  projectId?: string
+  project_id?: string
   slug: string
   name: string
-  platform: Platform
-  programUrl: string | null
-  status: 'active' | 'paused' | 'archived'
-  bountyRangeLow: number | null
-  bountyRangeHigh: number | null
-  currency: string
-  activeApproved: boolean
-  notes: string | null
-  rescanIntervalHrs: number
-  lastScannedAt: string | null
-  createdAt: string
+  platform: Platform | string
+  programUrl?: string | null
+  program_url?: string | null
+  status?: 'active' | 'paused' | 'archived'
+  active?: boolean
+  bountyRangeLow?: number | null
+  bountyRangeHigh?: number | null
+  currency?: string
+  activeApproved?: boolean
+  active_approved?: boolean
+  notes?: string | null
+  rescanIntervalHrs?: number
+  rescan_interval_hrs?: number
+  lastScannedAt?: string | null
+  createdBy?: Hunter | string | null
+  created_by?: string | null
+  createdAt?: string
+  created_at?: string
+  updated_at?: string
+  targets?: number
+  lastScan?: string
   stats?: ProgramStats
 }
 
@@ -67,32 +84,51 @@ export interface ProgramStats {
 
 export interface ScopeTarget {
   id: string
-  programId: string
-  targetType: ScopeType
-  targetValue: string
-  inScope: boolean
-  notes: string | null
-  addedBy: Hunter
-  addedAt: string
+  programId?: string
+  program_id?: string
+  targetType?: ScopeType | string
+  target_type?: ScopeType | string
+  targetValue?: string
+  target?: string
+  inScope?: boolean
+  out_of_scope?: boolean
+  source?: string | null
+  notes?: string | null
+  addedBy?: Hunter | string | null
+  added_by?: string | null
+  addedAt?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Subdomain {
   id: string
-  programId: string
-  rootDomain: string
+  programId?: string
+  program_id?: string
+  rootDomain?: string
   subdomain: string
-  ipAddress: string | null
-  statusCode: number | null
-  title: string | null
-  webServer: string | null
+  ipAddress?: string | null
+  ip_address?: string | null
+  statusCode?: number | null
+  status_code?: number | null
+  title?: string | null
+  webServer?: string | null
+  web_server?: string | null
   techStack: string[]
-  cdn: boolean
-  cdnProvider: string | null
-  isNew: boolean
-  isAlive: boolean
-  screenshotPath: string | null
-  firstSeen: string
-  lastSeen: string
+  tech?: string[]
+  content_type?: string | null
+  content_length?: number | null
+  cdn?: boolean
+  cdnProvider?: string | null
+  cdn_name?: string | null
+  source?: string
+  isNew?: boolean
+  isAlive?: boolean
+  screenshotPath?: string | null
+  firstSeen?: string
+  lastSeen?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Port {
@@ -109,63 +145,116 @@ export interface Port {
 
 export interface DiscoveredUrl {
   id: string
-  subdomainId: string
+  subdomainId?: string
+  subdomain_id?: string
+  program_id?: string
   url: string
   method: string
-  statusCode: number | null
-  contentLength: number | null
+  statusCode?: number | null
+  status_code?: number | null
+  contentLength?: number | null
+  content_length?: number | null
   source: string
   params: string[]
   foundAt: string
+  created_at?: string
 }
 
 export interface Finding {
   id: string
-  programId: string
-  subdomainId: string | null
-  urlId: string | null
+  programId?: string
+  program_id?: string
+  subdomainId?: string | null
+  subdomain_id?: string | null
+  urlId?: string | null
+  url_id?: string | null
   title: string
-  description: string | null
-  templateId: string | null
-  templateName: string | null
-  tool: string | null
+  description?: string | null
+  templateId?: string | null
+  templateName?: string | null
+  tool?: string | null
+  finding_type?: string
   severity: Severity
-  cvssScore: number | null
-  cveId: string | null
-  request: string | null
-  response: string | null
-  curlCommand: string | null
-  evidencePaths: string[]
-  screenshotPath: string | null
+  cvssScore?: number | null
+  cvss_score?: number | null
+  cveId?: string | null
+  request?: string | null
+  response?: string | null
+  curlCommand?: string | null
+  curl_command?: string | null
+  matched_at?: string | null
+  evidencePaths?: string[]
+  screenshotPath?: string | null
   status: FindingStatus
-  assignedTo: Hunter | null
+  assignedTo?: Hunter | null
+  assigned_to?: string | null
+  tags?: string[]
+  kanban_column?: string | null
+  duplicate_of?: string | null
   foundAt: string
-  triagedAt: string | null
-  validatedAt: string | null
-  submittedAt: string | null
-  bountyAmount: number | null
-  notes: string | null
-  reportPath: string | null
+  triagedAt?: string | null
+  validatedAt?: string | null
+  submittedAt?: string | null
+  bountyAmount?: number | null
+  notes?: string | null
+  reportPath?: string | null
+  created_at?: string
+  updated_at?: string
   program?: Program
   subdomain?: Subdomain
 }
 
 export interface ScanJob {
   id: string
-  programId: string
-  stage: 1 | 2 | 3 | 4 | 5
-  status: JobStatus
-  startedAt: string | null
-  finishedAt: string | null
-  triggeredBy: Hunter | null
-  triggeredByScheduler: boolean
-  tool: string | null
-  scriptPath: string | null
-  outputPath: string | null
-  findingsCount: number
-  errorMessage: string | null
-  createdAt: string
+  programId?: string
+  program_id?: string
+  stage: 1 | 2 | 3 | 4 | 5 | number | string
+  status: JobStatus | string
+  target?: string | null
+  subdomain_id?: string | null
+  subdomainId?: string | null
+  flags?: Record<string, any> | null
+  error_log?: string | null
+  errorMessage?: string | null
+  startedAt?: string | null
+  started_at?: string | null
+  finishedAt?: string | null
+  completed_at?: string | null
+  triggeredBy?: Hunter | null
+  triggeredByScheduler?: boolean
+  tool?: string | null
+  scriptPath?: string | null
+  outputPath?: string | null
+  findingsCount?: number
+  createdAt?: string
+  created_at?: string
+  updatedAt?: string
+  updated_at?: string
   program?: Program
+}
+
+export interface CreateJobPayload {
+  program_id: string
+  tool: string
+  target: string
+  stage?: number
+  flags?: Record<string, any>
+}
+
+export interface JobLogs {
+  job_id: string
+  stdout: string
+  stderr: string
+  exit_code: number | null
+  status: string
+}
+
+export interface JobArtifacts {
+  job_id: string
+  available: boolean
+  files: string[]
+  evidence_path: string | null
+  message?: string | null
 }
 
 export interface ProjectNote {

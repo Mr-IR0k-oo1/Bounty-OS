@@ -63,6 +63,26 @@ const config: Config = {
           low:      'var(--color-low)',
           info:     'var(--color-info)',
         },
+        critical: {
+          DEFAULT: 'var(--color-critical)',
+          muted:   'var(--color-critical-muted)',
+        },
+        high: {
+          DEFAULT: 'var(--color-high)',
+          muted:   'var(--color-high-muted)',
+        },
+        medium: {
+          DEFAULT: 'var(--color-medium)',
+          muted:   'var(--color-medium-muted)',
+        },
+        low: {
+          DEFAULT: 'var(--color-low)',
+          muted:   'var(--color-low-muted)',
+        },
+        info: {
+          DEFAULT: 'var(--color-info)',
+          muted:   'var(--color-info-muted)',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)'],

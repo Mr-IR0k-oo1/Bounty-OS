@@ -50,22 +50,18 @@ pub async fn auth_middleware(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    // Check if the session is blacklisted in Redis
-    let mut redis_conn = state
-        .redis()
-        .get_async_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let session_key = format!("session:{}", token_data.claims.sub);
-    let is_blacklisted: bool = redis::cmd("EXISTS")
-        .arg(&session_key)
-        .query_async(&mut redis_conn)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    if is_blacklisted {
-        return Err(StatusCode::UNAUTHORIZED);
+    // Check if the session is blacklisted in Redis (if Redis is accessible)
+    if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let session_key = format!("session:{}", token_data.claims.sub);
+        if let Ok(is_blacklisted) = redis::cmd("EXISTS")
+            .arg(&session_key)
+            .query_async::<_, bool>(&mut redis_conn)
+            .await
+        {
+            if is_blacklisted {
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        }
     }
 
     // Store the user ID in the request extensions as Uuid
@@ -105,9 +101,12 @@ mod tests {
             first_run: false,
             rust_log: "info".to_string(),
             evidence_base_path: "/tmp".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 8000,
+            max_concurrent_jobs: 2,
             llm: LlmConfig::default(),
         };
-        AppState::new(db_pool, redis_client, config, ws_tx)
+        AppState::new(db_pool, redis_client, config, ws_tx, false)
     }
 
     fn test_app() -> Router {

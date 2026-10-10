@@ -1,18 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Wrench, CheckCircle2, XCircle, RefreshCw, ExternalLink, Save, Plus } from "lucide-react"
 import { useToast } from "@/hooks/useToast"
+import { api } from "@/lib/api"
 
 const defaultTools = [
-  { name: "nuclei", path: "/usr/local/bin/nuclei", version: "3.4.0", healthy: true },
-  { name: "httpx", path: "/usr/local/bin/httpx", version: "1.6.5", healthy: true },
   { name: "subfinder", path: "/usr/local/bin/subfinder", version: "2.6.7", healthy: true },
+  { name: "httpx", path: "/usr/local/bin/httpx", version: "1.6.5", healthy: true },
   { name: "naabu", path: "/usr/local/bin/naabu", version: "2.3.2", healthy: true },
   { name: "katana", path: "/usr/local/bin/katana", version: "1.1.2", healthy: true },
+  { name: "nuclei", path: "/usr/local/bin/nuclei", version: "3.4.0", healthy: true },
   { name: "gau", path: "/usr/local/bin/gau", version: "2.2.4", healthy: false },
 ]
 
@@ -22,21 +23,58 @@ export default function ToolsSettingsPage() {
   const [checking, setChecking] = useState(false)
   const [testingTool, setTestingTool] = useState<string | null>(null)
 
+  useEffect(() => {
+    async function loadTools() {
+      try {
+        const res = await api.checkTools()
+        if (res && res.length > 0) {
+          setTools(
+            res.map((t) => ({
+              name: t.name,
+              path: t.path || `/usr/local/bin/${t.name}`,
+              version: t.version || "not detected",
+              healthy: t.healthy,
+            }))
+          )
+        }
+      } catch {
+        // Fallback if offline
+      }
+    }
+    loadTools()
+  }, [])
+
   function updatePath(name: string, path: string) {
     setTools((prev) => prev.map((t) => (t.name === name ? { ...t, path } : t)))
   }
 
   async function checkAll() {
     setChecking(true)
-    await new Promise((r) => setTimeout(r, 1200))
-    setTools((prev) =>
-      prev.map((t) => ({ ...t, healthy: t.name !== "gau" ? true : true, version: t.version || "1.0.0" }))
-    )
-    setChecking(false)
-    toast({
-      title: "Tool Check Complete",
-      description: "All 6 security binaries located and verified executable.",
-    })
+    try {
+      const res = await api.checkTools()
+      if (res && res.length > 0) {
+        setTools(
+          res.map((t) => ({
+            name: t.name,
+            path: t.path || `/usr/local/bin/${t.name}`,
+            version: t.version || "not detected",
+            healthy: t.healthy,
+          }))
+        )
+      }
+      toast({
+        title: "Tool Check Complete",
+        description: `Verified ${res.length} security tool binaries on runner.`,
+      })
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Check Failed",
+        description: e.message || "Could not contact tool runner.",
+      })
+    } finally {
+      setChecking(false)
+    }
   }
 
   async function testSingle(name: string) {

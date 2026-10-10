@@ -44,16 +44,33 @@ function statusIcon(status: JobStatus | null) {
 
 export function PipelineStatus({ jobs, onViewLogs }: PipelineStatusProps) {
   const stages: PipelineStage[] = [1, 2, 3, 4, 5].map((stage) => {
-    const job = jobs.filter((j) => j.stage === stage).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    const job = jobs
+      .filter((j) => Number(j.stage) === stage)
+      .sort((a, b) => {
+        const aTime = new Date((a.createdAt || a.created_at || a.startedAt || a.started_at || 0) as string).getTime()
+        const bTime = new Date((b.createdAt || b.created_at || b.startedAt || b.started_at || 0) as string).getTime()
+        return bTime - aTime
+      })[0]
+
+    const started = job?.startedAt || job?.started_at
+    const finished = job?.finishedAt || job?.completed_at
+    let durationStr: string | null = null
+    if (started && finished) {
+      const diffSecs = Math.round((new Date(finished).getTime() - new Date(started).getTime()) / 1000)
+      if (diffSecs < 60) {
+        durationStr = `${diffSecs}s`
+      } else {
+        durationStr = `${Math.round(diffSecs / 60)}m`
+      }
+    }
+
     return {
       stage,
-      label: stageLabels[stage].label,
-      description: stageLabels[stage].description,
-      lastRun: job?.startedAt || null,
-      duration: job?.finishedAt && job?.startedAt
-        ? `${Math.round((new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime()) / 60000)}m`
-        : null,
-      status: job?.status || null,
+      label: stageLabels[stage]?.label || `Stage ${stage}`,
+      description: stageLabels[stage]?.description || '',
+      lastRun: started || job?.createdAt || job?.created_at || null,
+      duration: durationStr,
+      status: (job?.status as JobStatus) || null,
       jobId: job?.id,
     }
   })

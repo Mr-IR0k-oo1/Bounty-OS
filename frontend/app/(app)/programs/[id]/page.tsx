@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -10,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   AlertTriangle, ChevronDown, Activity, CheckCircle2, XCircle, Clock, 
   Play, Globe, Server, Shield, Bug, ExternalLink, Edit3, X, Terminal, 
-  Layers, Link2, Image as ImageIcon, FileText
+  Layers, Link2, Image as ImageIcon, FileText, AlertCircle, RefreshCw 
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/useToast"
+import { api } from "@/lib/api"
 import { ApprovalGateBanner } from "@/components/programs/ApprovalGateBanner"
 import { PipelineStatus } from "@/components/programs/PipelineStatus"
 import { ScopeEditor } from "@/components/programs/ScopeEditor"
@@ -44,366 +45,154 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
   const router = useRouter()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState(0)
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search)
+      const tabParam = sp.get("tab")
+      const tabMap: Record<string, number> = {
+        overview: 0,
+        scope: 1,
+        recon: 2,
+        findings: 3,
+        reports: 4,
+      }
+      if (tabParam && tabMap[tabParam] !== undefined) {
+        setActiveTab(tabMap[tabParam])
+      }
+    }
+  }, [])
+
   const [reconSubTab, setReconSubTab] = useState<"subdomains" | "ports" | "urls" | "screenshots">("subdomains")
   const [scanMenuOpen, setScanMenuOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [logModalJobId, setLogModalJobId] = useState<string | null>(null)
 
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [program, setProgram] = useState<Program>({
-    id: params.id || "uber-prog",
-    projectId: "proj-1",
-    slug: "uber",
-    name: "Uber Bug Bounty",
-    platform: "h1",
-    programUrl: "https://hackerone.com/uber",
+    id: params.id,
+    projectId: "",
+    slug: "",
+    name: "Loading...",
+    platform: "other",
+    programUrl: null,
     status: "active",
-    bountyRangeLow: 500,
-    bountyRangeHigh: 30000,
+    bountyRangeLow: null,
+    bountyRangeHigh: null,
     currency: "USD",
     activeApproved: false,
-    notes: "Main ride-sharing and food delivery endpoints in scope. Avoid DDoS and social engineering.",
+    notes: null,
     rescanIntervalHrs: 24,
-    lastScannedAt: "2 hours ago",
-    createdAt: "2026-02-10T12:00:00Z"
+    lastScannedAt: null,
+    createdAt: new Date().toISOString()
   })
 
   // Edit form state
-  const [editName, setEditName] = useState(program.name)
-  const [editUrl, setEditUrl] = useState(program.programUrl || "")
-  const [editNotes, setEditNotes] = useState(program.notes || "")
-  const [editMinBounty, setEditMinBounty] = useState(String(program.bountyRangeLow || 500))
-  const [editMaxBounty, setEditMaxBounty] = useState(String(program.bountyRangeHigh || 30000))
+  const [editName, setEditName] = useState("")
+  const [editUrl, setEditUrl] = useState("")
+  const [editNotes, setEditNotes] = useState("")
+  const [editMinBounty, setEditMinBounty] = useState("0")
+  const [editMaxBounty, setEditMaxBounty] = useState("0")
 
-  const [targets, setTargets] = useState<ScopeTarget[]>([
-    {
-      id: "tgt-1",
-      programId: program.id,
-      targetType: "wildcard",
-      targetValue: "*.uber.com",
-      inScope: true,
-      notes: "Primary production wildcard",
-      addedBy: mockHunter,
-      addedAt: "2026-02-10T12:00:00Z"
-    },
-    {
-      id: "tgt-2",
-      programId: program.id,
-      targetType: "wildcard",
-      targetValue: "*.ubereats.com",
-      inScope: true,
-      notes: "Uber Eats domains",
-      addedBy: mockHunter,
-      addedAt: "2026-02-10T12:05:00Z"
-    },
-    {
-      id: "tgt-3",
-      programId: program.id,
-      targetType: "domain",
-      targetValue: "partners.uber.com",
-      inScope: true,
-      notes: "Driver partner portal",
-      addedBy: mockHunter,
-      addedAt: "2026-02-10T12:10:00Z"
-    },
-    {
-      id: "tgt-4",
-      programId: program.id,
-      targetType: "domain",
-      targetValue: "help.uber.com",
-      inScope: false,
-      notes: "Zendesk hosted help center - strictly out of scope",
-      addedBy: mockHunter,
-      addedAt: "2026-02-10T12:12:00Z"
+  const [targets, setTargets] = useState<ScopeTarget[]>([])
+  const [jobs, setJobs] = useState<ScanJob[]>([])
+  const [subdomains, setSubdomains] = useState<Subdomain[]>([])
+  const [ports, setPorts] = useState<Port[]>([])
+  const [urls, setUrls] = useState<DiscoveredUrl[]>([])
+  const [findings, setFindings] = useState<Finding[]>([])
+
+  const fetchAllProgramData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [prog, scopeList, subList, urlList, fList, jList] = await Promise.all([
+        api.getProgram(params.id),
+        api.listScope(params.id).catch(() => []),
+        api.listSubdomains(params.id).catch(() => []),
+        api.listUrls(params.id).catch(() => []),
+        api.listProgramFindings(params.id).catch(() => []),
+        api.listProgramJobs(params.id).catch(() => []),
+      ])
+
+      const isApproved = prog.activeApproved ?? prog.active_approved ?? false
+      setProgram({
+        ...prog,
+        projectId: prog.projectId || prog.project_id || "",
+        activeApproved: isApproved,
+        active_approved: isApproved,
+        status: prog.active !== false ? "active" : "archived",
+      })
+      setEditName(prog.name)
+      setEditUrl(prog.programUrl || prog.program_url || "")
+      setEditNotes(prog.notes || "")
+      setEditMinBounty(String(prog.bountyRangeLow || 0))
+      setEditMaxBounty(String(prog.bountyRangeHigh || 0))
+
+      const normalizedTargets = scopeList.map((t: any) => ({
+        ...t,
+        targetType: (t.targetType || t.target_type || "domain") as ScopeType,
+        targetValue: t.targetValue || t.target || "",
+        inScope: t.inScope !== undefined ? t.inScope : !t.out_of_scope,
+        addedBy: typeof t.addedBy === "object" && t.addedBy !== null ? t.addedBy : mockHunter,
+        addedAt: t.addedAt || (t.created_at ? new Date(t.created_at).toISOString() : new Date().toISOString()),
+      }))
+      setTargets(normalizedTargets)
+
+      const normalizedSubdomains = subList.map((s: any) => ({
+        ...s,
+        ipAddress: s.ipAddress ?? s.ip_address ?? null,
+        statusCode: s.statusCode ?? s.status_code ?? null,
+        webServer: s.webServer ?? s.web_server ?? null,
+        techStack: s.techStack || s.tech || [],
+        isAlive: s.isAlive ?? ((s.statusCode ?? s.status_code ?? 0) > 0),
+        firstSeen: s.firstSeen || (s.created_at ? new Date(s.created_at).toLocaleDateString() : "Just now"),
+        lastSeen: s.lastSeen || "Recently",
+      }))
+      setSubdomains(normalizedSubdomains)
+
+      const normalizedUrls = urlList.map((u: any) => ({
+        ...u,
+        subdomainId: u.subdomainId || u.subdomain_id || "",
+        statusCode: u.statusCode ?? u.status_code ?? 200,
+        contentLength: u.contentLength ?? u.content_length ?? 0,
+        foundAt: u.foundAt || "Recently",
+      }))
+      setUrls(normalizedUrls)
+
+      const normalizedFindings = fList.map((f: any) => ({
+        ...f,
+        programId: f.programId || f.program_id || params.id,
+        subdomainId: f.subdomainId || f.subdomain_id || null,
+        urlId: f.urlId || f.url_id || null,
+        severity: (f.severity || "info") as any,
+        status: (f.status || "new") as any,
+        foundAt: f.foundAt || (f.created_at ? new Date(f.created_at).toISOString() : new Date().toISOString()),
+        program: prog,
+      }))
+      setFindings(normalizedFindings)
+      setJobs(jList)
+    } catch (e: any) {
+      setError(e.message || "Failed to load program")
+    } finally {
+      setLoading(false)
     }
-  ])
+  }, [params.id])
 
-  const [jobs, setJobs] = useState<ScanJob[]>([
-    {
-      id: "job-s1",
-      programId: program.id,
-      stage: 1,
-      status: "done",
-      startedAt: "2h ago",
-      finishedAt: "1h 55m ago",
-      triggeredBy: mockHunter,
-      triggeredByScheduler: false,
-      tool: "subfinder, amass",
-      scriptPath: "/tools/recon/subdomain.sh",
-      outputPath: "/data/uber/stage1.json",
-      findingsCount: 0,
-      errorMessage: null,
-      createdAt: "2026-09-19T10:00:00Z"
-    },
-    {
-      id: "job-s2",
-      programId: program.id,
-      stage: 2,
-      status: "done",
-      startedAt: "1h 50m ago",
-      finishedAt: "1h 44m ago",
-      triggeredBy: mockHunter,
-      triggeredByScheduler: false,
-      tool: "httpx, dnsx",
-      scriptPath: "/tools/recon/resolve.sh",
-      outputPath: "/data/uber/stage2.json",
-      findingsCount: 0,
-      errorMessage: null,
-      createdAt: "2026-09-19T10:15:00Z"
-    },
-    {
-      id: "job-s3",
-      programId: program.id,
-      stage: 3,
-      status: "running",
-      startedAt: "25m ago",
-      finishedAt: null,
-      triggeredBy: mockHunter,
-      triggeredByScheduler: false,
-      tool: "naabu, nmap",
-      scriptPath: "/tools/recon/portscan.sh",
-      outputPath: "/data/uber/stage3.json",
-      findingsCount: 3,
-      errorMessage: null,
-      createdAt: "2026-09-19T11:40:00Z"
-    },
-    {
-      id: "job-s4",
-      programId: program.id,
-      stage: 4,
-      status: "queued",
-      startedAt: null,
-      finishedAt: null,
-      triggeredBy: mockHunter,
-      triggeredByScheduler: true,
-      tool: "katana, gau",
-      scriptPath: "/tools/recon/crawler.sh",
-      outputPath: "/data/uber/stage4.json",
-      findingsCount: 0,
-      errorMessage: null,
-      createdAt: "2026-09-19T12:00:00Z"
-    },
-    {
-      id: "job-s5",
-      programId: program.id,
-      stage: 5,
-      status: "queued",
-      startedAt: null,
-      finishedAt: null,
-      triggeredBy: mockHunter,
-      triggeredByScheduler: false,
-      tool: "nuclei",
-      scriptPath: "/tools/recon/nuclei.sh",
-      outputPath: "/data/uber/stage5.json",
-      findingsCount: 0,
-      errorMessage: null,
-      createdAt: "2026-09-19T12:05:00Z"
-    }
-  ])
-
-  const [subdomains, setSubdomains] = useState<Subdomain[]>([
-    {
-      id: "sub-1",
-      programId: program.id,
-      rootDomain: "uber.com",
-      subdomain: "auth.uber.com",
-      ipAddress: "104.16.85.20",
-      statusCode: 200,
-      title: "Uber Single Sign-On",
-      webServer: "cloudflare",
-      techStack: ["React", "Cloudflare", "OpenID"],
-      cdn: true,
-      cdnProvider: "Cloudflare",
-      isNew: false,
-      isAlive: true,
-      screenshotPath: "/mock-screen-1.png",
-      firstSeen: "2026-02-10",
-      lastSeen: "10m ago"
-    },
-    {
-      id: "sub-2",
-      programId: program.id,
-      rootDomain: "uber.com",
-      subdomain: "api.uber.com",
-      ipAddress: "104.16.86.20",
-      statusCode: 403,
-      title: "Direct API Gateway",
-      webServer: "envoy",
-      techStack: ["Envoy", "gRPC", "REST"],
-      cdn: true,
-      cdnProvider: "Cloudflare",
-      isNew: false,
-      isAlive: true,
-      screenshotPath: "/mock-screen-2.png",
-      firstSeen: "2026-02-10",
-      lastSeen: "15m ago"
-    },
-    {
-      id: "sub-3",
-      programId: program.id,
-      rootDomain: "uber.com",
-      subdomain: "internal-metrics.staging.uber.com",
-      ipAddress: "198.51.100.42",
-      statusCode: 401,
-      title: "Prometheus Dashboard - Staging",
-      webServer: "nginx/1.22.1",
-      techStack: ["Prometheus", "Nginx", "Grafana"],
-      cdn: false,
-      cdnProvider: null,
-      isNew: true,
-      isAlive: true,
-      screenshotPath: "/mock-screen-3.png",
-      firstSeen: "Today",
-      lastSeen: "20m ago"
-    },
-    {
-      id: "sub-4",
-      programId: program.id,
-      rootDomain: "ubereats.com",
-      subdomain: "restaurant-portal.ubereats.com",
-      ipAddress: "151.101.65.140",
-      statusCode: 200,
-      title: "Uber Eats Restaurant Management",
-      webServer: "Fastly",
-      techStack: ["React", "Fastly", "Next.js"],
-      cdn: true,
-      cdnProvider: "Fastly",
-      isNew: false,
-      isAlive: true,
-      screenshotPath: "/mock-screen-4.png",
-      firstSeen: "2026-02-12",
-      lastSeen: "1h ago"
-    },
-    {
-      id: "sub-5",
-      programId: program.id,
-      rootDomain: "uber.com",
-      subdomain: "dev-cluster01.corp.uber.com",
-      ipAddress: "192.0.2.78",
-      statusCode: 502,
-      title: "Bad Gateway",
-      webServer: "cloudflare",
-      techStack: ["Cloudflare"],
-      cdn: true,
-      cdnProvider: "Cloudflare",
-      isNew: true,
-      isAlive: false,
-      screenshotPath: null,
-      firstSeen: "Today",
-      lastSeen: "3h ago"
-    }
-  ])
-
-  const ports: Port[] = [
-    { id: "p-1", subdomainId: "sub-1", port: 443, protocol: "tcp", service: "https", version: "TLSv1.3", banner: "HTTP/2 200 OK", firstSeen: "2026-02-10", lastSeen: "10m ago" },
-    { id: "p-2", subdomainId: "sub-1", port: 80, protocol: "tcp", service: "http", version: null, banner: "301 Moved Permanently", firstSeen: "2026-02-10", lastSeen: "10m ago" },
-    { id: "p-3", subdomainId: "sub-2", port: 443, protocol: "tcp", service: "https", version: "Envoy proxy", banner: "HTTP/2 403 Forbidden", firstSeen: "2026-02-10", lastSeen: "15m ago" },
-    { id: "p-4", subdomainId: "sub-3", port: 9090, protocol: "tcp", service: "prometheus", version: "2.45.0", banner: "Prometheus Metrics Exporter", firstSeen: "Today", lastSeen: "20m ago" },
-    { id: "p-5", subdomainId: "sub-3", port: 80, protocol: "tcp", service: "http", version: "nginx/1.22.1", banner: "nginx", firstSeen: "Today", lastSeen: "20m ago" },
-    { id: "p-6", subdomainId: "sub-4", port: 443, protocol: "tcp", service: "https", version: "Fastly", banner: "HTTP/2 200 OK", firstSeen: "2026-02-12", lastSeen: "1h ago" }
-  ]
-
-  const urls: DiscoveredUrl[] = [
-    { id: "u-1", subdomainId: "sub-1", url: "https://auth.uber.com/v2/authorize?client_id=web", method: "GET", statusCode: 200, contentLength: 14502, source: "crawler", params: ["client_id", "response_type", "redirect_uri"], foundAt: "1h ago" },
-    { id: "u-2", subdomainId: "sub-1", url: "https://auth.uber.com/api/v1/sessions/verify", method: "POST", statusCode: 400, contentLength: 204, source: "crawler", params: ["session_token"], foundAt: "1h ago" },
-    { id: "u-3", subdomainId: "sub-3", url: "http://internal-metrics.staging.uber.com:9090/api/v1/query?query=up", method: "GET", statusCode: 200, contentLength: 890, source: "naabu", params: ["query", "time"], foundAt: "25m ago" },
-    { id: "u-4", subdomainId: "sub-3", url: "http://internal-metrics.staging.uber.com:9090/metrics", method: "GET", statusCode: 200, contentLength: 48920, source: "gau", params: [], foundAt: "20m ago" },
-    { id: "u-5", subdomainId: "sub-4", url: "https://restaurant-portal.ubereats.com/api/orders/export", method: "POST", statusCode: 401, contentLength: 120, source: "katana", params: ["store_id", "format"], foundAt: "45m ago" }
-  ]
-
-  const [findings, setFindings] = useState<Finding[]>([
-    {
-      id: "fnd-101",
-      programId: program.id,
-      subdomainId: "sub-3",
-      urlId: "u-3",
-      title: "Exposed Prometheus Metrics API with Unauthenticated Staging Telemetry",
-      description: "Prometheus server on port 9090 was found publicly accessible without authentication, exposing internal cluster metrics and service topologies.",
-      templateId: "cve-prometheus-metrics-unauth",
-      templateName: "Prometheus Metrics Exposure",
-      tool: "nuclei",
-      severity: "high",
-      cvssScore: 7.5,
-      cveId: null,
-      request: "GET /api/v1/query?query=up HTTP/1.1\nHost: internal-metrics.staging.uber.com:9090\nUser-Agent: BountyOS-Scanner/1.0",
-      response: "HTTP/1.1 200 OK\nContent-Type: application/json\n\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"up\",\"job\":\"kubernetes-nodes\"},\"value\":[1726743600,\"1\"]}]}}",
-      curlCommand: "curl -ik -s 'http://internal-metrics.staging.uber.com:9090/api/v1/query?query=up'",
-      evidencePaths: [],
-      screenshotPath: null,
-      status: "triaged",
-      assignedTo: mockHunter,
-      foundAt: "2026-09-19T11:42:00Z",
-      triagedAt: "2026-09-19T11:45:00Z",
-      validatedAt: null,
-      submittedAt: null,
-      bountyAmount: null,
-      notes: "Valid staging leak. Verify if internal IP addresses or auth tokens are reflected in metrics labels.",
-      reportPath: null,
-      program: program
-    },
-    {
-      id: "fnd-102",
-      programId: program.id,
-      subdomainId: "sub-1",
-      urlId: "u-1",
-      title: "Open Redirect in OAuth Callback Parameter redirect_uri",
-      description: "The OAuth authorization flow allows arbitrary parameter pollution causing redirection to attacker domains when validating malformed schemeless URIs.",
-      templateId: "oauth-redirect-validation",
-      templateName: "OAuth Redirect Bypass",
-      tool: "manual",
-      severity: "medium",
-      cvssScore: 6.1,
-      cveId: null,
-      request: "GET /v2/authorize?client_id=web&redirect_uri=https://auth.uber.com.attacker.com/callback HTTP/1.1\nHost: auth.uber.com",
-      response: "HTTP/1.1 302 Found\nLocation: https://auth.uber.com.attacker.com/callback?code=xyz\nSet-Cookie: session_auth=...",
-      curlCommand: "curl -ik 'https://auth.uber.com/v2/authorize?client_id=web&redirect_uri=https://auth.uber.com.attacker.com/callback'",
-      evidencePaths: [],
-      screenshotPath: null,
-      status: "validated",
-      assignedTo: mockHunter,
-      foundAt: "2026-09-18T14:15:00Z",
-      triagedAt: "2026-09-18T14:30:00Z",
-      validatedAt: "2026-09-18T15:00:00Z",
-      submittedAt: null,
-      bountyAmount: null,
-      notes: "Confirmed on Chrome and Safari. POC ready for submission.",
-      reportPath: null,
-      program: program
-    },
-    {
-      id: "fnd-103",
-      programId: program.id,
-      subdomainId: "sub-4",
-      urlId: "u-5",
-      title: "Broken Object Level Authorization (BOLA) in Restaurant Orders Export",
-      description: "Manipulating store_id in /api/orders/export yields full transaction details for other restaurant partners without permission check.",
-      templateId: "api-bola-id-check",
-      templateName: "BOLA / IDOR Verification",
-      tool: "manual",
-      severity: "critical",
-      cvssScore: 9.1,
-      cveId: null,
-      request: "POST /api/orders/export HTTP/1.1\nHost: restaurant-portal.ubereats.com\nAuthorization: Bearer <TOKEN_STORE_A>\nContent-Type: application/json\n\n{\"store_id\": \"STORE_B_UUID\", \"format\": \"csv\"}",
-      response: "HTTP/1.1 200 OK\nContent-Type: text/csv\n\norder_id,customer_name,total,address\n9812,John Doe,$44.20,123 Main St",
-      curlCommand: "curl -ik -X POST 'https://restaurant-portal.ubereats.com/api/orders/export' -H 'Authorization: Bearer ...' -d '{\"store_id\":\"STORE_B_UUID\"}'",
-      evidencePaths: [],
-      screenshotPath: null,
-      status: "new",
-      assignedTo: null,
-      foundAt: "2026-09-19T09:10:00Z",
-      triagedAt: null,
-      validatedAt: null,
-      submittedAt: null,
-      bountyAmount: null,
-      notes: "Critical risk. High likelihood of maximum bounty payout ($15,000+). Needs prompt triage and report generation.",
-      reportPath: null,
-      program: program
-    }
-  ])
+  useEffect(() => {
+    fetchAllProgramData()
+  }, [fetchAllProgramData])
 
   // Handlers
   async function handleApproveActive(id: string) {
-    setProgram((prev) => ({ ...prev, activeApproved: true }))
-    toast({ title: "Active scanning approved", description: "Stages 3 & 4 unlocked for automated scanning." })
+    try {
+      await api.approveProgram(id)
+      setProgram((prev) => ({ ...prev, activeApproved: true, active_approved: true }))
+      toast({ title: "Active scanning approved", description: "Stages 3 & 4 unlocked for automated scanning." })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Approval failed", description: e.message })
+    }
   }
 
   async function handleAddScopeTarget(newTarget: {
@@ -412,65 +201,129 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
     inScope: boolean
     notes?: string
   }) {
-    const created: ScopeTarget = {
-      id: `tgt-${Date.now()}`,
-      programId: program.id,
-      targetType: newTarget.targetType,
-      targetValue: newTarget.targetValue,
-      inScope: newTarget.inScope,
-      notes: newTarget.notes || null,
-      addedBy: mockHunter,
-      addedAt: new Date().toISOString()
+    try {
+      const created = await api.addScope(program.id, {
+        target: newTarget.targetValue,
+        target_type: newTarget.targetType,
+        out_of_scope: !newTarget.inScope,
+        notes: newTarget.notes || null,
+      })
+      const normalized: ScopeTarget = {
+        ...created,
+        targetType: newTarget.targetType,
+        targetValue: newTarget.targetValue,
+        inScope: newTarget.inScope,
+        notes: newTarget.notes || null,
+        addedBy: mockHunter,
+        addedAt: new Date().toISOString()
+      }
+      setTargets((prev) => [normalized, ...prev])
+      toast({ title: "Scope target added", description: `${newTarget.targetValue} added to scope.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to add scope", description: e.message })
     }
-    setTargets((prev) => [created, ...prev])
-    toast({ title: "Scope target added", description: `${created.targetValue} added to scope.` })
   }
 
   async function handleRemoveScopeTarget(id: string) {
-    setTargets((prev) => prev.filter((t) => t.id !== id))
-    toast({ title: "Scope target removed", description: "Target removed from program scope." })
+    try {
+      await api.deleteScope(id)
+      setTargets((prev) => prev.filter((t) => t.id !== id))
+      toast({ title: "Scope target removed", description: "Target removed from program scope." })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to remove scope", description: e.message })
+    }
   }
 
-  function handleTriggerScan(stageName: string, stageNumber?: number) {
+  async function handleTriggerScan(stageName: string, stageNumber?: number) {
     setScanMenuOpen(false)
-    if (!program.activeApproved && stageNumber && stageNumber >= 3) {
+    if (!program.activeApproved && !program.active_approved && stageNumber && stageNumber >= 3) {
       toast({ variant: "destructive", title: "Action Blocked", description: "Active scanning not approved for this program. Approve active scanning first." })
       return
     }
 
-    const newJob: ScanJob = {
-      id: `job-${Date.now()}`,
-      programId: program.id,
-      stage: (stageNumber || 1) as 1 | 2 | 3 | 4 | 5,
-      status: "running",
-      startedAt: "Just now",
-      finishedAt: null,
-      triggeredBy: mockHunter,
-      triggeredByScheduler: false,
-      tool: stageName.toLowerCase().includes("vuln") ? "nuclei" : "recon-engine",
-      scriptPath: `/tools/recon/${stageName.toLowerCase().replace(/[^a-z0-9]/g, "")}.sh`,
-      outputPath: `/data/scans/${Date.now()}.json`,
-      findingsCount: 0,
-      errorMessage: null,
-      createdAt: new Date().toISOString()
-    }
+    try {
+      await api.scanProgram(program.id)
+      const newJob: ScanJob = {
+        id: `job-${Date.now()}`,
+        programId: program.id,
+        stage: (stageNumber || 1) as 1 | 2 | 3 | 4 | 5,
+        status: "running",
+        startedAt: "Just now",
+        finishedAt: null,
+        triggeredBy: mockHunter,
+        triggeredByScheduler: false,
+        tool: stageName.toLowerCase().includes("vuln") ? "nuclei" : "recon-engine",
+        scriptPath: `/tools/recon/${stageName.toLowerCase().replace(/[^a-z0-9]/g, "")}.sh`,
+        outputPath: `/data/scans/${Date.now()}.json`,
+        findingsCount: 0,
+        errorMessage: null,
+        createdAt: new Date().toISOString()
+      }
 
-    setJobs((prev) => [newJob, ...prev])
-    toast({ title: "Scan Dispatched", description: `Dispatched scan: ${stageName}` })
+      setJobs((prev) => [newJob, ...prev])
+      toast({ title: "Scan Dispatched", description: `Dispatched scan: ${stageName}` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Scan dispatch failed", description: e.message })
+    }
   }
 
-  function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault()
-    setProgram((prev) => ({
-      ...prev,
-      name: editName,
-      programUrl: editUrl || null,
-      notes: editNotes || null,
-      bountyRangeLow: parseFloat(editMinBounty) || 0,
-      bountyRangeHigh: parseFloat(editMaxBounty) || 0
-    }))
-    setEditModalOpen(false)
-    toast({ title: "Program updated", description: "Program settings saved successfully." })
+    try {
+      await api.updateProgram(program.id, {
+        name: editName,
+        programUrl: editUrl || null,
+        notes: editNotes || null,
+        bountyRangeLow: parseFloat(editMinBounty) || 0,
+        bountyRangeHigh: parseFloat(editMaxBounty) || 0
+      })
+      setProgram((prev) => ({
+        ...prev,
+        name: editName,
+        programUrl: editUrl || null,
+        notes: editNotes || null,
+        bountyRangeLow: parseFloat(editMinBounty) || 0,
+        bountyRangeHigh: parseFloat(editMaxBounty) || 0
+      }))
+      setEditModalOpen(false)
+      toast({ title: "Program updated", description: "Program settings saved successfully." })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update failed", description: e.message })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-28 bg-bg-elevated border border-border rounded-2xl" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 bg-bg-elevated border border-border rounded-xl" />
+          ))}
+        </div>
+        <div className="h-64 bg-bg-elevated border border-border rounded-xl" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-severity-critical/10 text-severity-critical mb-2">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-text-primary">Failed to load target program</h2>
+        <p className="text-xs text-text-muted max-w-md mx-auto">{error}</p>
+        <div className="flex justify-center gap-3 pt-2">
+          <Button variant="ghost" onClick={() => router.push("/programs")} className="text-xs">
+            Back to Programs
+          </Button>
+          <Button onClick={() => fetchAllProgramData()} className="btn-primary text-xs gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -483,7 +336,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
           </button>
           <span>/</span>
           <button onClick={() => router.push(`/projects/${program.projectId}`)} className="hover:text-primary transition-colors">
-            H1 Private Programs
+            Project
           </button>
           <span>/</span>
           <span className="text-text-secondary font-medium">{program.name}</span>
@@ -506,7 +359,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
                   "badge text-[10px] font-semibold",
                   program.status === "active" ? "bg-low-muted text-low" : "bg-medium-muted text-medium"
                 )}>
-                  {program.status.toUpperCase()}
+                  {(program.status || "active").toUpperCase()}
                 </span>
                 {program.activeApproved ? (
                   <span className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold flex items-center gap-1">
@@ -590,7 +443,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         {/* Approval Gate Banner */}
         <ApprovalGateBanner
           programId={program.id}
-          isApproved={program.activeApproved}
+          isApproved={program.activeApproved ?? false}
           onApprove={handleApproveActive}
         />
       </header>
@@ -609,7 +462,15 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
           return (
             <button
               key={tab.label}
-              onClick={() => setActiveTab(i)}
+              onClick={() => {
+                setActiveTab(i)
+                if (typeof window !== "undefined") {
+                  const tabKeys = ["overview", "scope", "recon", "findings", "reports"]
+                  const url = new URL(window.location.href)
+                  url.searchParams.set("tab", tabKeys[i])
+                  window.history.replaceState(null, "", url.toString())
+                }
+              }}
               className={cn(
                 "flex items-center gap-2 px-4 py-3 text-xs font-semibold transition-all duration-150 border-b-2 -mb-px",
                 isActive
@@ -737,7 +598,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
                     <div className="text-xs text-text-muted flex items-center gap-3">
                       <span>Tool: {f.tool || "Manual"}</span>
                       <span>•</span>
-                      <span>Found {new Date(f.foundAt).toLocaleDateString()}</span>
+                      <span>Found {f.foundAt ? new Date(f.foundAt).toLocaleDateString() : (f.created_at ? new Date(f.created_at).toLocaleDateString() : "Recently")}</span>
                     </div>
                   </div>
                   <span className="badge bg-bg-elevated border border-border text-xs text-text-secondary capitalize">

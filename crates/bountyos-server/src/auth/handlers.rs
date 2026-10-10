@@ -31,12 +31,20 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     // Find the hunter by username
-    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE username = $1"#)
-        .bind(&payload.username)
-        .fetch_optional(state.db())
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let hunter = if state.has_db() {
+        match sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE username = $1"#)
+            .bind(&payload.username)
+            .fetch_optional(state.db())
+            .await
+        {
+            Ok(Some(h)) => Some(h),
+            Ok(None) => None,
+            Err(_) => state.find_hunter(&payload.username).await,
+        }
+    } else {
+        state.find_hunter(&payload.username).await
+    }
+    .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Verify the password
     if !crate::auth::password::verify_password(&payload.password, &hunter.password_hash) {
@@ -57,22 +65,17 @@ pub async fn login(
         crate::auth::tokens::generate_tokens(&hunter.id, &state.config().jwt_secret)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Store the refresh token in Redis
-    let mut redis_conn = state
-        .redis()
-        .get_async_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let refresh_token_key = format!("refresh_token:{}", hunter.id);
-    redis::cmd("SET")
-        .arg(&refresh_token_key)
-        .arg(&refresh_token)
-        .arg("EX")
-        .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async::<_, ()>(&mut redis_conn)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Store the refresh token in Redis (if available)
+    if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let refresh_token_key = format!("refresh_token:{}", hunter.id);
+        let _ = redis::cmd("SET")
+            .arg(&refresh_token_key)
+            .arg(&refresh_token)
+            .arg("EX")
+            .arg(7 * 24 * 60 * 60) // 7 days
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+    }
 
     Ok(Json(LoginResponse {
         access_token,
@@ -86,22 +89,17 @@ pub async fn logout(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // Blacklist the session in Redis
-    let mut redis_conn = state
-        .redis()
-        .get_async_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let session_key = format!("session:{}", user_id);
-    redis::cmd("SET")
-        .arg(&session_key)
-        .arg("1")
-        .arg("EX")
-        .arg(7 * 24 * 60 * 60) // 7 days
-        .query_async::<_, ()>(&mut redis_conn)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Blacklist the session in Redis (if available)
+    if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let session_key = format!("session:{}", user_id);
+        let _ = redis::cmd("SET")
+            .arg(&session_key)
+            .arg("1")
+            .arg("EX")
+            .arg(7 * 24 * 60 * 60) // 7 days
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -276,12 +274,19 @@ pub async fn me(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
 ) -> Result<Json<Hunter>, StatusCode> {
-    // Find the hunter by ID
-    let hunter = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE id = $1"#)
-        .bind(user_id)
-        .fetch_one(state.db())
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if state.has_db() {
+        if let Ok(hunter) = sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE id = $1"#)
+            .bind(user_id)
+            .fetch_one(state.db())
+            .await
+        {
+            return Ok(Json(hunter));
+        }
+    }
 
-    Ok(Json(hunter))
+    if let Some(hunter) = state.get_hunter_by_id(&user_id).await {
+        return Ok(Json(hunter));
+    }
+
+    Err(StatusCode::NOT_FOUND)
 }

@@ -32,7 +32,7 @@ export function useProjects() {
 
   const createProject = useCallback(async (data: Partial<Project>) => {
     const created = await api.createProject(data)
-    setProjects((prev) => [...prev, created])
+    setProjects((prev) => [created, ...prev])
     return created
   }, [])
 

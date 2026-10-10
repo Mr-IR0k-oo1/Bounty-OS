@@ -17,15 +17,46 @@ pub fn create_router(
     redis_pool: crate::redis::RedisPool,
     config: AppConfig,
     ws_tx: broadcast::Sender<String>,
+    has_db: bool,
 ) -> Router {
     // Create shared state
-    let shared_state = AppState::new(db_pool, redis_pool, config, ws_tx);
+    let shared_state = AppState::new(db_pool, redis_pool, config, ws_tx, has_db);
+
+    let audit_layer = axum::middleware::from_fn_with_state(
+        shared_state.clone(),
+        crate::middleware::audit::audit_middleware,
+    );
+    let login_limiter = tower::ServiceBuilder::new()
+        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
+            tower_governor::errors::display_error(e)
+        }))
+        .layer(crate::middleware::rate_limit::login_rate_limit_layer())
+        .layer(audit_layer.clone());
+
+    let state_change_limiter = tower::ServiceBuilder::new()
+        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
+            tower_governor::errors::display_error(e)
+        }))
+        .layer(crate::middleware::rate_limit::rate_limit_layer());
+
+    let refresh_limiter = tower::ServiceBuilder::new()
+        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
+            tower_governor::errors::display_error(e)
+        }))
+        .layer(crate::middleware::rate_limit::rate_limit_layer())
+        .layer(audit_layer.clone());
 
     // Public routes (no authentication required)
     let public_router = Router::new()
         .route("/health", get(api_health))
-        .route("/auth/login", post(crate::auth::handlers::login))
-        .route("/auth/refresh", post(crate::auth::handlers::refresh))
+        .route(
+            "/auth/login",
+            post(crate::auth::handlers::login).layer(login_limiter),
+        )
+        .route(
+            "/auth/refresh",
+            post(crate::auth::handlers::refresh).layer(refresh_limiter),
+        )
         // WebSocket route (not globally protected yet per spec)
         .route("/ws/jobs/:id", get(crate::handlers::ws::ws_handler))
         // Static evidence route
@@ -37,47 +68,60 @@ pub fn create_router(
     // Protected routes (require valid JWT access token)
     let protected_router = Router::new()
         // Authenticated auth routes
-        .route("/auth/logout", post(crate::auth::handlers::logout))
-        .route("/auth/2fa/setup", post(crate::auth::handlers::setup_2fa))
-        .route("/auth/2fa/verify", post(crate::auth::handlers::verify_2fa))
+        .route(
+            "/auth/logout",
+            post(crate::auth::handlers::logout).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/auth/2fa/setup",
+            post(crate::auth::handlers::setup_2fa).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/auth/2fa/verify",
+            post(crate::auth::handlers::verify_2fa).layer(state_change_limiter.clone()),
+        )
         .route("/auth/me", get(crate::auth::handlers::me))
         // Project routes
         .route("/projects", get(crate::handlers::projects::list_projects))
-        .route("/projects", post(crate::handlers::projects::create_project))
+        .route(
+            "/projects",
+            post(crate::handlers::projects::create_project).layer(state_change_limiter.clone()),
+        )
         .route("/projects/:id", get(crate::handlers::projects::get_project))
         .route(
             "/projects/:id",
-            put(crate::handlers::projects::update_project),
+            put(crate::handlers::projects::update_project).layer(state_change_limiter.clone()),
         )
         .route(
             "/projects/:id",
-            delete(crate::handlers::projects::delete_project),
+            delete(crate::handlers::projects::delete_project).layer(state_change_limiter.clone()),
         )
         // Program routes
+        .route("/programs", get(crate::handlers::programs::list_all_programs))
         .route(
             "/projects/:id/programs",
             get(crate::handlers::programs::list_programs),
         )
         .route(
             "/projects/:id/programs",
-            post(crate::handlers::programs::create_program),
+            post(crate::handlers::programs::create_program).layer(state_change_limiter.clone()),
         )
         .route("/programs/:id", get(crate::handlers::programs::get_program))
         .route(
             "/programs/:id",
-            put(crate::handlers::programs::update_program),
+            put(crate::handlers::programs::update_program).layer(state_change_limiter.clone()),
         )
         .route(
             "/programs/:id",
-            delete(crate::handlers::programs::delete_program),
+            delete(crate::handlers::programs::delete_program).layer(state_change_limiter.clone()),
         )
         .route(
             "/programs/:id/approve",
-            post(crate::handlers::programs::approve_program),
+            post(crate::handlers::programs::approve_program).layer(state_change_limiter.clone()),
         )
         .route(
             "/programs/:id/scan",
-            post(crate::handlers::programs::scan_program),
+            post(crate::handlers::programs::scan_program).layer(state_change_limiter.clone()),
         )
         // Scope routes
         .route(
@@ -86,13 +130,19 @@ pub fn create_router(
         )
         .route(
             "/programs/:id/scope",
-            post(crate::handlers::scope::add_scope),
+            post(crate::handlers::scope::add_scope).layer(state_change_limiter.clone()),
         )
-        .route("/scope/:id", put(crate::handlers::scope::update_scope))
-        .route("/scope/:id", delete(crate::handlers::scope::delete_scope))
+        .route(
+            "/scope/:id",
+            put(crate::handlers::scope::update_scope).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/scope/:id",
+            delete(crate::handlers::scope::delete_scope).layer(state_change_limiter.clone()),
+        )
         .route(
             "/programs/:id/scope/import",
-            post(crate::handlers::scope::import_scope),
+            post(crate::handlers::scope::import_scope).layer(state_change_limiter.clone()),
         )
         // Subdomain routes
         .route(
@@ -123,24 +173,24 @@ pub fn create_router(
         .route("/findings/:id", get(crate::handlers::findings::get_finding))
         .route(
             "/findings/:id",
-            put(crate::handlers::findings::update_finding),
+            put(crate::handlers::findings::update_finding).layer(state_change_limiter.clone()),
         )
         .route(
             "/findings/:id/claim",
-            post(crate::handlers::findings::claim_finding),
+            post(crate::handlers::findings::claim_finding).layer(state_change_limiter.clone()),
         )
         .route(
             "/findings/:id/validate",
-            post(crate::handlers::findings::validate_finding),
+            post(crate::handlers::findings::validate_finding).layer(state_change_limiter.clone()),
         )
         .route(
             "/findings/:id/report",
-            post(crate::handlers::findings::report_finding),
+            post(crate::handlers::findings::report_finding).layer(state_change_limiter.clone()),
         )
         // LLM triage routes
         .route(
             "/findings/:id/triage",
-            post(crate::handlers::findings::triage_finding),
+            post(crate::handlers::findings::triage_finding).layer(state_change_limiter.clone()),
         )
         .route(
             "/findings/:id/triage",
@@ -149,35 +199,67 @@ pub fn create_router(
         // Kanban (finding-level)
         .route(
             "/findings/:id/kanban",
-            put(crate::handlers::findings::move_finding_kanban),
+            put(crate::handlers::findings::move_finding_kanban).layer(state_change_limiter.clone()),
         )
         // Job routes
         .route("/jobs", get(crate::handlers::jobs::list_jobs))
         .route(
+            "/jobs",
+            post(crate::handlers::jobs::create_job).layer(state_change_limiter.clone()),
+        )
+        .route(
             "/programs/:id/jobs",
             get(crate::handlers::jobs::list_program_jobs),
         )
+        .route(
+            "/programs/:id/jobs",
+            post(crate::handlers::jobs::create_program_job).layer(state_change_limiter.clone()),
+        )
         .route("/jobs/:id", get(crate::handlers::jobs::get_job))
-        .route("/jobs/:id", delete(crate::handlers::jobs::cancel_job))
+        .route(
+            "/jobs/:id",
+            delete(crate::handlers::jobs::cancel_job).layer(state_change_limiter.clone()),
+        )
+        .route("/jobs/:id/logs", get(crate::handlers::jobs::get_job_logs))
+        .route(
+            "/jobs/:id/artifacts",
+            get(crate::handlers::jobs::get_job_artifacts),
+        )
         // Hunter routes
         .route("/hunters", get(crate::handlers::hunters::list_hunters))
-        .route("/hunters", post(crate::handlers::hunters::create_hunter))
-        .route("/hunters/:id", put(crate::handlers::hunters::update_hunter))
+        .route(
+            "/hunters",
+            post(crate::handlers::hunters::create_hunter).layer(state_change_limiter.clone()),
+        )
         .route(
             "/hunters/:id",
-            delete(crate::handlers::hunters::delete_hunter),
+            put(crate::handlers::hunters::update_hunter).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/hunters/:id",
+            delete(crate::handlers::hunters::delete_hunter).layer(state_change_limiter.clone()),
         )
         // Token routes
         .route("/tokens", get(crate::handlers::tokens::list_tokens))
-        .route("/tokens", post(crate::handlers::tokens::create_token))
-        .route("/tokens/:id", delete(crate::handlers::tokens::delete_token))
+        .route(
+            "/tokens",
+            post(crate::handlers::tokens::create_token).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/tokens/:id",
+            delete(crate::handlers::tokens::delete_token).layer(state_change_limiter.clone()),
+        )
         // Settings routes
         .route("/settings", get(crate::handlers::settings::get_settings))
-        .route("/settings", put(crate::handlers::settings::update_settings))
+        .route(
+            "/settings",
+            put(crate::handlers::settings::update_settings).layer(state_change_limiter.clone()),
+        )
         .route(
             "/settings/tools/check",
-            post(crate::handlers::settings::check_tools),
+            post(crate::handlers::settings::check_tools).layer(state_change_limiter.clone()),
         )
+        .route_layer(audit_layer)
         .route_layer(axum::middleware::from_fn_with_state(
             shared_state.clone(),
             crate::auth::middleware::auth_middleware,

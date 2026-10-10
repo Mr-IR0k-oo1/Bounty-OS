@@ -11,6 +11,16 @@ pub async fn list_scope(
     State(state): State<AppState>,
     Path(program_id): Path<Uuid>,
 ) -> Result<Json<Vec<ScopeTarget>>, StatusCode> {
+    if !state.has_db() {
+        let scope = state.in_memory_scope().read().await;
+        let targets: Vec<ScopeTarget> = scope
+            .iter()
+            .filter(|s| s.program_id == program_id)
+            .cloned()
+            .collect();
+        return Ok(Json(targets));
+    }
+
     let pool = state.db();
     let targets = sqlx::query_as::<_, ScopeTarget>(
         "SELECT * FROM scope_targets WHERE program_id = $1 ORDER BY created_at ASC",
@@ -40,11 +50,28 @@ pub async fn add_scope(
     Path(program_id): Path<Uuid>,
     Json(payload): Json<AddScopeRequest>,
 ) -> Result<Json<ScopeTarget>, StatusCode> {
-    let pool = state.db();
     let added_by = user_id_ext.map(|axum::extract::Extension(id)| id);
     let target_type = payload.target_type.unwrap_or_else(|| "domain".to_string());
     let out_of_scope = payload.out_of_scope.unwrap_or(false);
 
+    if !state.has_db() {
+        let mut scope = state.in_memory_scope().write().await;
+        let new_target = ScopeTarget {
+            id: Uuid::new_v4(),
+            program_id,
+            target: payload.target,
+            target_type,
+            out_of_scope,
+            source: payload.source,
+            added_by,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        scope.push(new_target.clone());
+        return Ok(Json(new_target));
+    }
+
+    let pool = state.db();
     let target = sqlx::query_as::<_, ScopeTarget>(
         r#"INSERT INTO scope_targets (program_id, target, target_type, out_of_scope, source, added_by)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -84,6 +111,27 @@ pub async fn update_scope(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateScopeRequest>,
 ) -> Result<Json<ScopeTarget>, StatusCode> {
+    if !state.has_db() {
+        let mut scope = state.in_memory_scope().write().await;
+        if let Some(s) = scope.iter_mut().find(|s| s.id == id) {
+            if let Some(target) = payload.target {
+                s.target = target;
+            }
+            if let Some(tt) = payload.target_type {
+                s.target_type = tt;
+            }
+            if let Some(oos) = payload.out_of_scope {
+                s.out_of_scope = oos;
+            }
+            if let Some(src) = payload.source {
+                s.source = Some(src);
+            }
+            s.updated_at = chrono::Utc::now();
+            return Ok(Json(s.clone()));
+        }
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let pool = state.db();
     let target = sqlx::query_as::<_, ScopeTarget>(
         r#"UPDATE scope_targets SET
@@ -111,6 +159,16 @@ pub async fn delete_scope(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
+    if !state.has_db() {
+        let mut scope = state.in_memory_scope().write().await;
+        let initial_len = scope.len();
+        scope.retain(|s| s.id != id);
+        if scope.len() < initial_len {
+            return Ok(StatusCode::NO_CONTENT);
+        }
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let pool = state.db();
     sqlx::query("DELETE FROM scope_targets WHERE id = $1")
         .bind(id)
@@ -134,11 +192,54 @@ pub async fn import_scope(
     Path(program_id): Path<Uuid>,
     Json(payload): Json<ImportScopeRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let pool = state.db();
     let added_by = user_id_ext.map(|axum::extract::Extension(id)| id);
     let out_of_scope = payload.out_of_scope.unwrap_or(false);
     let default_type = payload.target_type.unwrap_or_else(|| "domain".to_string());
 
+    if !state.has_db() {
+        let mut scope = state.in_memory_scope().write().await;
+        let mut imported = 0;
+        for raw in payload.targets {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let target_type = if trimmed.starts_with("*.") || trimmed.starts_with('.') {
+                "wildcard"
+            } else if trimmed.contains('/') {
+                "cidr"
+            } else if trimmed.parse::<std::net::IpAddr>().is_ok() {
+                "ip"
+            } else if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                "url"
+            } else {
+                &default_type
+            };
+
+            if !scope.iter().any(|s| s.program_id == program_id && s.target == trimmed) {
+                scope.push(ScopeTarget {
+                    id: Uuid::new_v4(),
+                    program_id,
+                    target: trimmed.to_string(),
+                    target_type: target_type.to_string(),
+                    out_of_scope,
+                    source: Some("import".to_string()),
+                    added_by,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                });
+                imported += 1;
+            }
+        }
+
+        return Ok(Json(serde_json::json!({
+            "status": "success",
+            "imported_count": imported
+        })));
+    }
+
+    let pool = state.db();
     let mut imported = 0;
     for raw in payload.targets {
         let trimmed = raw.trim();

@@ -21,6 +21,21 @@ pub async fn list_findings(
     State(state): State<AppState>,
     Query(params): Query<ListFindingsParams>,
 ) -> Result<Json<Vec<Finding>>, StatusCode> {
+    if !state.has_db() {
+        let findings = state.in_memory_findings().read().await;
+        let mut filtered = findings.clone();
+        if let Some(pid) = params.program_id {
+            filtered.retain(|f| f.program_id == pid);
+        }
+        if let Some(sev) = &params.severity {
+            filtered.retain(|f| f.severity.eq_ignore_ascii_case(sev));
+        }
+        if let Some(st) = &params.status {
+            filtered.retain(|f| f.status.eq_ignore_ascii_case(st));
+        }
+        return Ok(Json(filtered));
+    }
+
     let pool = state.db();
     let findings =
         match (params.program_id, params.severity, params.status) {
@@ -66,6 +81,14 @@ pub async fn get_finding(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Finding>, StatusCode> {
+    if !state.has_db() {
+        let findings = state.in_memory_findings().read().await;
+        if let Some(finding) = findings.iter().find(|f| f.id == id) {
+            return Ok(Json(finding.clone()));
+        }
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let pool = state.db();
     let finding = sqlx::query_as::<_, Finding>("SELECT * FROM findings WHERE id = $1")
         .bind(id)
@@ -177,6 +200,22 @@ pub async fn list_project_findings(
     State(state): State<AppState>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Vec<Finding>>, StatusCode> {
+    if !state.has_db() {
+        let progs = state.in_memory_programs().read().await;
+        let prog_ids: Vec<Uuid> = progs
+            .iter()
+            .filter(|p| p.project_id == project_id)
+            .map(|p| p.id)
+            .collect();
+        let findings = state.in_memory_findings().read().await;
+        let filtered: Vec<Finding> = findings
+            .iter()
+            .filter(|f| prog_ids.contains(&f.program_id))
+            .cloned()
+            .collect();
+        return Ok(Json(filtered));
+    }
+
     let pool = state.db();
     let findings = sqlx::query_as::<_, Finding>(
         r#"SELECT f.* FROM findings f
@@ -199,6 +238,16 @@ pub async fn list_program_findings(
     State(state): State<AppState>,
     Path(program_id): Path<Uuid>,
 ) -> Result<Json<Vec<Finding>>, StatusCode> {
+    if !state.has_db() {
+        let findings = state.in_memory_findings().read().await;
+        let filtered: Vec<Finding> = findings
+            .iter()
+            .filter(|f| f.program_id == program_id)
+            .cloned()
+            .collect();
+        return Ok(Json(filtered));
+    }
+
     let pool = state.db();
     let findings = sqlx::query_as::<_, Finding>(
         "SELECT * FROM findings WHERE program_id = $1 ORDER BY created_at DESC",

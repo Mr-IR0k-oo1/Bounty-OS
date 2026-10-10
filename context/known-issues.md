@@ -11,7 +11,7 @@ Maintained. Facts verified from repository reads and BOUNTY-FRONTEND-002 validat
 5. **6 ESLint warnings (pre-existing).** `jsx-a11y/alt-text` (recon page), `@next/next/no-img-element` (`setup`, `ScreenshotGrid`).
 6. **Severity utility classes don't map.** Pages use `bg-critical`, `text-critical`, `border-critical/30` etc., but `tailwind.config.ts` only defines `severity.{critical,high,medium,low,info}` — these classes are silently not generated, so some severity badge colors may not render. Pre-existing; needs a config naming fix or class migration.
 7. **`bun install` blocks one postinstall** (bun sandbox "Blocked 1 postinstall"). Didn't affect install/lint/typecheck/build. Run `bun pm untrusted` to review.
-8. **Uncommitted working-tree changes not from task work:** `app/globals.css` and `public/bg.png`.
+8. **`app/globals.css` and `public/bg.png` committed:** Previously uncommitted visual styling and assets were committed under `7becdb7`.
 9. **components.json `tailwind.css` path is stale** (`styles/globals.css` vs actual `app/globals.css`). Cosmetic for shadcn tooling only.
 10. **`next.config.js` uses `env:`** to inline `NEXT_PUBLIC_*` — works, but redundant with Next's automatic `NEXT_PUBLIC_` exposure.
 

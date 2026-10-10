@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 
 interface EvidenceViewerProps {
-  request: string | null
-  response: string | null
-  curlCommand: string | null
+  request?: string | null
+  response?: string | null
+  curlCommand?: string | null
 }
 
 export function EvidenceViewer({ request, response, curlCommand }: EvidenceViewerProps) {

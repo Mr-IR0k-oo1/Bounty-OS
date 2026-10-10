@@ -36,14 +36,28 @@ async fn main() {
     let config = config::load_config().expect("Failed to load configuration");
 
     // Connect PostgreSQL
-    let db_pool = db::init_db_pool(&config.database_url)
-        .await
-        .expect("Failed to initialize database pool");
-
-    // Run database migrations (idempotent across runs)
-    db::migrations::run_migrations(&db_pool)
-        .await
-        .expect("Failed to run database migrations");
+    let (db_pool, has_db) = match db::init_db_pool(&config.database_url).await {
+        Ok(pool) => {
+            tracing::info!("Connected to PostgreSQL database");
+            if let Err(e) = db::migrations::run_migrations(&pool).await {
+                tracing::warn!("Failed to run database migrations: {:?}. Proceeding.", e);
+            }
+            if let Err(e) = db::seed_defaults_if_empty(&pool).await {
+                tracing::warn!("Failed to seed default database records: {:?}. Proceeding.", e);
+            }
+            (pool, true)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Could not connect to PostgreSQL at {}: {:?}. Falling back to lazy pool and in-memory store.",
+                config.database_url,
+                e
+            );
+            let pool = db::init_lazy_db_pool(&config.database_url)
+                .expect("Failed to initialize lazy database pool");
+            (pool, false)
+        }
+    };
 
     // Connect Redis
     let redis_pool = redis::init_redis_pool(&config.redis_url)
@@ -61,19 +75,33 @@ async fn main() {
         .route("/health", get(health_check))
         .nest(
             "/api",
-            app::create_router(db_pool, redis_pool, config.clone(), ws_tx),
+            app::create_router(db_pool, redis_pool, config.clone(), ws_tx, has_db),
         )
         .layer(TraceLayer::new_for_http());
 
-    // Run our app with hyper, listening globally on port 8000
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    // Run our app with hyper, listening on configured address (defaults to 127.0.0.1:8000 for private interface binding)
+    let addr: SocketAddr = format!("{}:{}", config.host, config.port)
+        .parse()
+        .unwrap_or_else(|_| {
+            tracing::warn!(
+                "Invalid host:port '{}:{}', falling back to 127.0.0.1:8000",
+                config.host,
+                config.port
+            );
+            SocketAddr::from(([127, 0, 0, 1], 8000))
+        });
     tracing::info!("Listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Failed to bind to address");
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
 
 /// Basic handler that responds with a static string

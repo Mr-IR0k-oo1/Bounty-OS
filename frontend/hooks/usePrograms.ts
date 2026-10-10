@@ -50,6 +50,23 @@ export function usePrograms(projectId?: string) {
     return api.scanProgram(id)
   }, [])
 
+  const updateProgram = useCallback(
+    async (id: string, data: Partial<Program>) => {
+      const updated = await api.updateProgram(id, data)
+      setPrograms((prev) => prev.map((p) => (p.id === id ? updated : p)))
+      return updated
+    },
+    []
+  )
+
+  const deleteProgram = useCallback(
+    async (id: string) => {
+      await api.deleteProgram(id)
+      setPrograms((prev) => prev.filter((p) => p.id !== id))
+    },
+    []
+  )
+
   return {
     programs,
     loading,
@@ -57,6 +74,8 @@ export function usePrograms(projectId?: string) {
     refetch: fetchPrograms,
     getProgram,
     createProgram,
+    updateProgram,
+    deleteProgram,
     approveProgram,
     scanProgram,
   }

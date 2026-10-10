@@ -14,16 +14,20 @@ const statusIcons: Record<JobStatus, React.ElementType> = {
   queued: Clock,
   running: Loader2,
   done: CheckCircle,
+  succeeded: CheckCircle,
   failed: AlertCircle,
   cancelled: XCircle,
+  timed_out: AlertCircle,
 }
 
 const statusColors: Record<JobStatus, string> = {
   queued: 'text-text-muted',
   running: 'text-severity-info',
   done: 'text-severity-low',
+  succeeded: 'text-severity-low',
   failed: 'text-severity-critical',
   cancelled: 'text-text-muted',
+  timed_out: 'text-severity-medium',
 }
 
 const stageLabels: Record<number, string> = {
@@ -36,11 +40,13 @@ const stageLabels: Record<number, string> = {
 
 export function ActiveJobs({ jobs, onCancel }: ActiveJobsProps) {
   const active = jobs.filter((j) => j.status === 'queued' || j.status === 'running')
-  const recent = jobs.filter((j) => j.status === 'done' || j.status === 'failed' || j.status === 'cancelled').slice(0, 5)
+  const recent = jobs.filter((j) => j.status === 'done' || j.status === 'succeeded' || j.status === 'failed' || j.status === 'cancelled' || j.status === 'timed_out').slice(0, 5)
 
   function JobRow({ job }: { job: ScanJob }) {
-    const Icon = statusIcons[job.status]
-    const color = statusColors[job.status]
+    const statusKey = (job.status as JobStatus) in statusIcons ? (job.status as JobStatus) : 'queued'
+    const Icon = statusIcons[statusKey]
+    const color = statusColors[statusKey]
+    const stageNum = Number(job.stage) || 1
 
     return (
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-bg-surface transition-colors rounded-lg">
@@ -50,7 +56,7 @@ export function ActiveJobs({ jobs, onCancel }: ActiveJobsProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-text-primary">
-              Stage {job.stage}: {stageLabels[job.stage] || `Stage ${job.stage}`}
+              Stage {stageNum}: {stageLabels[stageNum] || `Stage ${stageNum}`}
             </span>
             <span className={`text-[10px] font-mono uppercase tracking-wider ${color}`}>
               {job.status}
@@ -60,7 +66,7 @@ export function ActiveJobs({ jobs, onCancel }: ActiveJobsProps) {
             {job.tool && <span>Tool: {job.tool}</span>}
             {job.startedAt && <span>Started: {new Date(job.startedAt).toLocaleTimeString()}</span>}
             {job.triggeredBy && <span>By: {job.triggeredBy.username}</span>}
-            {job.findingsCount > 0 && <span>Findings: {job.findingsCount}</span>}
+            {(job.findingsCount ?? 0) > 0 && <span>Findings: {job.findingsCount}</span>}
           </div>
           {(job.status === 'running' || job.status === 'queued') && onCancel && (
             <div className="mt-2">
@@ -110,11 +116,18 @@ export function ActiveJobs({ jobs, onCancel }: ActiveJobsProps) {
               <div key={job.id} className="px-4 py-2 hover:bg-bg-surface transition-colors">
                 <div className="flex items-center gap-2 text-xs">
                   <div className="flex-shrink-0">
-                    {React.createElement(statusIcons[job.status], { className: `w-3 h-3 ${statusColors[job.status]}` })}
+                    {React.createElement(
+                      statusIcons[(job.status as JobStatus) in statusIcons ? (job.status as JobStatus) : 'queued'],
+                      {
+                        className: `w-3 h-3 ${
+                          statusColors[(job.status as JobStatus) in statusColors ? (job.status as JobStatus) : 'queued']
+                        }`,
+                      }
+                    )}
                   </div>
                   <span className="font-mono text-text-muted">
                     Stage {job.stage}
-                    {job.findingsCount > 0 && <> · {job.findingsCount} findings</>}
+                    {(job.findingsCount ?? 0) > 0 && <> · {job.findingsCount} findings</>}
                   </span>
                 </div>
               </div>

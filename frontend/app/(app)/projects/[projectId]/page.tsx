@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import { ProjectTimeline } from "@/components/projects/ProjectTimeline"
 import { ProgramForm } from "@/components/programs/ProgramForm"
 import { useToast } from "@/hooks/useToast"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 export default function ProjectOverviewPage() {
   const params = useParams()
@@ -37,11 +38,46 @@ export default function ProjectOverviewPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"overview" | "programs" | "kanban" | "notes" | "timeline" | "team">("overview")
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search)
+      const tabParam = sp.get("tab")
+      if (tabParam && ["overview", "programs", "kanban", "notes", "timeline", "team"].includes(tabParam)) {
+        setActiveTab(tabParam as any)
+      }
+    }
+  }, [])
+
   const [projectData, setProjectData] = useState({
-    name: "Q1 2025 Engagements",
+    name: "Loading Project...",
     status: "Active",
-    description: "Top-tier private invite-only bug bounty engagements and assets.",
+    description: "",
   })
+
+  useEffect(() => {
+    if (!projectId) return
+    api.getProject(projectId)
+      .then((p) => {
+        if (p) {
+          const isActive = p.active !== undefined ? p.active : p.status !== "archived"
+          setProjectData({
+            name: p.name,
+            status: isActive ? "Active" : "Archived",
+            description: p.description || "Bug bounty engagement container.",
+          })
+        }
+      })
+      .catch((err) => {
+        // Fallback for non-UUID / demo IDs
+        if (projectId === "1" || projectId === "2" || projectId === "3") {
+          setProjectData({
+            name: "Q1 2025 Engagements",
+            status: "Active",
+            description: "Top-tier private invite-only bug bounty engagements and assets.",
+          })
+        }
+      })
+  }, [projectId])
 
   // Programs state
   const [programsList, setProgramsList] = useState([
@@ -218,7 +254,14 @@ export default function ProjectOverviewPage() {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key)
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location.href)
+                url.searchParams.set("tab", tab.key)
+                window.history.replaceState(null, "", url.toString())
+              }
+            }}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               activeTab === tab.key
                 ? "bg-bg-elevated text-text-primary shadow-sm"

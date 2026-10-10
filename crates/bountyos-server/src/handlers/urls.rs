@@ -17,6 +17,10 @@ pub async fn list_urls(
     Path(program_id): Path<Uuid>,
     Query(params): Query<ListUrlsParams>,
 ) -> Result<Json<Vec<Url>>, StatusCode> {
+    if !state.has_db() {
+        return Ok(Json(vec![]));
+    }
+
     let pool = state.db();
     let urls = match params.subdomain_id {
         Some(sub_id) => {

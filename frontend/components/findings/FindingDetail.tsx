@@ -127,7 +127,7 @@ export function FindingDetail({ finding, onClaim, onValidate }: FindingDetailPro
           </div>
         )}
         {tab === 'evidence' && (
-          <EvidenceViewer request={finding.request} response={finding.response} curlCommand={finding.curlCommand} />
+          <EvidenceViewer request={finding.request ?? null} response={finding.response ?? null} curlCommand={finding.curlCommand ?? null} />
         )}
         {tab === 'notes' && (
           <div className="card p-6">
