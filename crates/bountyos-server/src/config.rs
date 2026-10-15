@@ -124,7 +124,10 @@ pub fn load_config() -> Result<AppConfig, config::ConfigError> {
         let url = format!("postgres://{}:{}@{}:{}/{}", user, pass, host, port, db);
         config.set("database_url", url)?;
     } else if config.get_string("database_url").is_err() {
-        config.set("database_url", "postgres://bountyos:bountyos@localhost:5432/bountyos")?;
+        config.set(
+            "database_url",
+            "postgres://bountyos:bountyos@localhost:5432/bountyos",
+        )?;
     }
 
     // Redis URL: explicit env var, derived from components, or config file

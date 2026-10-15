@@ -15,11 +15,10 @@ pub async fn list_all_programs(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Program>>, StatusCode> {
     if state.has_db() {
-        if let Ok(programs) = sqlx::query_as::<_, Program>(
-            r#"SELECT * FROM programs ORDER BY created_at DESC"#,
-        )
-        .fetch_all(state.db())
-        .await
+        if let Ok(programs) =
+            sqlx::query_as::<_, Program>(r#"SELECT * FROM programs ORDER BY created_at DESC"#)
+                .fetch_all(state.db())
+                .await
         {
             return Ok(Json(programs));
         }

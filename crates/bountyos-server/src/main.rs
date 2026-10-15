@@ -43,7 +43,10 @@ async fn main() {
                 tracing::warn!("Failed to run database migrations: {:?}. Proceeding.", e);
             }
             if let Err(e) = db::seed_defaults_if_empty(&pool).await {
-                tracing::warn!("Failed to seed default database records: {:?}. Proceeding.", e);
+                tracing::warn!(
+                    "Failed to seed default database records: {:?}. Proceeding.",
+                    e
+                );
             }
             (pool, true)
         }

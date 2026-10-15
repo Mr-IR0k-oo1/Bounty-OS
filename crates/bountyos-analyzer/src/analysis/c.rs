@@ -45,11 +45,7 @@ pub fn find_unbounded_stack_copies(source: &str) -> Vec<BufferCopyFact> {
     results
 }
 
-fn collect_stack_buffers(
-    node: Node,
-    source: &[u8],
-    declarations: &mut Vec<BufferDeclaration>,
-) {
+fn collect_stack_buffers(node: Node, source: &[u8], declarations: &mut Vec<BufferDeclaration>) {
     if node.kind() == "declaration" {
         if let Some(declaration) = parse_char_array(node, source) {
             declarations.push(declaration);
@@ -88,13 +84,7 @@ fn parse_char_array(node: Node, source: &[u8]) -> Option<BufferDeclaration> {
 
     let size = declarator
         .child_by_field_name("size")
-        .and_then(|size_node| {
-            size_node
-                .utf8_text(source)
-                .ok()?
-                .parse::<usize>()
-                .ok()
-        });
+        .and_then(|size_node| size_node.utf8_text(source).ok()?.parse::<usize>().ok());
 
     Some(BufferDeclaration {
         name,
@@ -117,9 +107,7 @@ fn walk_calls(
     }
 
     if node.kind() == "call_expression" {
-        if let Some(fact) =
-            inspect_copy_call(node, source, function.as_deref(), declarations)
-        {
+        if let Some(fact) = inspect_copy_call(node, source, function.as_deref(), declarations) {
             results.push(fact);
         }
     }
@@ -127,13 +115,7 @@ fn walk_calls(
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
-        walk_calls(
-            child,
-            source,
-            function.clone(),
-            declarations,
-            results,
-        );
+        walk_calls(child, source, function.clone(), declarations, results);
     }
 }
 
@@ -183,9 +165,7 @@ fn inspect_copy_call(
 
     let source_argument = source_node.utf8_text(source).ok()?.to_string();
 
-    let declaration = declarations
-        .iter()
-        .find(|decl| decl.name == destination)?;
+    let declaration = declarations.iter().find(|decl| decl.name == destination)?;
 
     Some(BufferCopyFact {
         function: function.unwrap_or("<unknown>").to_string(),

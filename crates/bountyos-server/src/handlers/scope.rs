@@ -217,7 +217,10 @@ pub async fn import_scope(
                 &default_type
             };
 
-            if !scope.iter().any(|s| s.program_id == program_id && s.target == trimmed) {
+            if !scope
+                .iter()
+                .any(|s| s.program_id == program_id && s.target == trimmed)
+            {
                 scope.push(ScopeTarget {
                     id: Uuid::new_v4(),
                     program_id,

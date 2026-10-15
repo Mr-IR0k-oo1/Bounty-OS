@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 
-use crate::AppState;
 use crate::pipeline::tools::ToolRegistry;
+use crate::AppState;
 
 pub async fn get_settings(
     State(state): State<AppState>,
@@ -29,4 +29,3 @@ pub async fn check_tools(
     let tools = ToolRegistry::check_all().await;
     Ok(Json(serde_json::json!(tools)))
 }
-

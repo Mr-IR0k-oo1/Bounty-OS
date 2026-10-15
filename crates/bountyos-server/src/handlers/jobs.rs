@@ -180,7 +180,9 @@ pub async fn cancel_job(
         job.status = "cancelled".to_string();
         job.completed_at = Some(now);
         job.updated_at = now;
-        let _ = state.ws_tx().send(format!("[job:{}] Job cancelled by operator", id));
+        let _ = state
+            .ws_tx()
+            .send(format!("[job:{}] Job cancelled by operator", id));
         return Ok(Json(job.clone()));
     }
 
@@ -207,7 +209,13 @@ pub async fn create_job(
 
     // 1. Strict tool whitelisting (never execute arbitrary paths or shell commands)
     let allowed_tools = [
-        "subfinder", "httpx", "naabu", "katana", "nuclei", "gau", "waybackurls",
+        "subfinder",
+        "httpx",
+        "naabu",
+        "katana",
+        "nuclei",
+        "gau",
+        "waybackurls",
     ];
     if !allowed_tools.contains(&tool.as_str()) {
         return Err((
@@ -220,14 +228,12 @@ pub async fn create_job(
 
     // 2. Validate program existence and status
     let program = if state.has_db() {
-        sqlx::query_as::<_, crate::models::program::Program>(
-            "SELECT * FROM programs WHERE id = $1",
-        )
-        .bind(payload.program_id)
-        .fetch_optional(state.db())
-        .await
-        .ok()
-        .flatten()
+        sqlx::query_as::<_, crate::models::program::Program>("SELECT * FROM programs WHERE id = $1")
+            .bind(payload.program_id)
+            .fetch_optional(state.db())
+            .await
+            .ok()
+            .flatten()
     } else {
         let lock = state.in_memory_programs().read().await;
         lock.iter().find(|p| p.id == payload.program_id).cloned()
@@ -273,7 +279,10 @@ pub async fn create_job(
             }
         };
 
-        if let Err(e) = crate::pipeline::subfinder::validate_domains_in_scope(&domains, program.id, &state).await {
+        if let Err(e) =
+            crate::pipeline::subfinder::validate_domains_in_scope(&domains, program.id, &state)
+                .await
+        {
             return Err((
                 StatusCode::UNPROCESSABLE_ENTITY,
                 Json(json!({"error": e.to_string()})),
@@ -291,7 +300,11 @@ pub async fn create_job(
             // Check explicit out-of-scope rules first
             let is_explicit_oos = rules.iter().any(|r| {
                 r.out_of_scope
-                    && crate::pipeline::scope_check::matches_scope(&target, &r.target, &r.target_type)
+                    && crate::pipeline::scope_check::matches_scope(
+                        &target,
+                        &r.target,
+                        &r.target_type,
+                    )
             });
 
             if is_explicit_oos {
@@ -300,7 +313,11 @@ pub async fn create_job(
                 // Check in-scope rules
                 rules.iter().any(|r| {
                     !r.out_of_scope
-                        && crate::pipeline::scope_check::matches_scope(&target, &r.target, &r.target_type)
+                        && crate::pipeline::scope_check::matches_scope(
+                            &target,
+                            &r.target,
+                            &r.target_type,
+                        )
                 })
             }
         };
@@ -333,7 +350,10 @@ pub async fn create_job(
     let mut flags_map = serde_json::Map::new();
     flags_map.insert("tool".to_string(), json!(tool));
     flags_map.insert("target".to_string(), json!(target));
-    flags_map.insert("command".to_string(), json!(format!("{} -d {} -silent -all", tool, target)));
+    flags_map.insert(
+        "command".to_string(),
+        json!(format!("{} -d {} -silent -all", tool, target)),
+    );
     flags_map.insert("exit_code".to_string(), json!(0));
     flags_map.insert(
         "stdout".to_string(),
@@ -356,7 +376,11 @@ pub async fn create_job(
         target: Some(target.clone()),
         flags: Some(serde_json::Value::Object(flags_map)),
         error_log: None,
-        started_at: if initial_status == "running" { Some(now) } else { None },
+        started_at: if initial_status == "running" {
+            Some(now)
+        } else {
+            None
+        },
         completed_at: None,
         created_at: now,
         updated_at: now,
@@ -445,7 +469,9 @@ pub async fn create_job(
                     j.completed_at = Some(finished_at);
                     j.updated_at = finished_at;
                 }
-                let _ = state_clone.ws_tx().send(format!("[job:{}] Scan job completed successfully.", job_id));
+                let _ = state_clone
+                    .ws_tx()
+                    .send(format!("[job:{}] Scan job completed successfully.", job_id));
             });
         }
     }
@@ -496,7 +522,10 @@ pub async fn get_job_logs(
     }
 
     if stdout.is_empty() && stderr.is_empty() {
-        stdout = format!("[job:{}] No console output captured yet (status: {}).", id, job.status);
+        stdout = format!(
+            "[job:{}] No console output captured yet (status: {}).",
+            id, job.status
+        );
     }
 
     Ok(Json(JobLogsResponse {
@@ -529,7 +558,9 @@ pub async fn get_job_artifacts(
     }
 
     let evidence_path = job.flags.as_ref().and_then(|f| {
-        f.get("evidence_path").and_then(|v| v.as_str()).map(|s| s.to_string())
+        f.get("evidence_path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
     });
 
     if !files.is_empty() {
@@ -554,7 +585,10 @@ pub async fn get_job_artifacts(
             available: false,
             files: vec![],
             evidence_path: None,
-            message: Some("No saved evidence artifacts are available for this job, or they have expired.".to_string()),
+            message: Some(
+                "No saved evidence artifacts are available for this job, or they have expired."
+                    .to_string(),
+            ),
         }))
     }
 }

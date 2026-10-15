@@ -27,22 +27,22 @@ pub fn create_router(
         crate::middleware::audit::audit_middleware,
     );
     let login_limiter = tower::ServiceBuilder::new()
-        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
-            tower_governor::errors::display_error(e)
-        }))
+        .layer(axum::error_handling::HandleErrorLayer::new(
+            |e: axum::BoxError| async move { tower_governor::errors::display_error(e) },
+        ))
         .layer(crate::middleware::rate_limit::login_rate_limit_layer())
         .layer(audit_layer.clone());
 
     let state_change_limiter = tower::ServiceBuilder::new()
-        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
-            tower_governor::errors::display_error(e)
-        }))
+        .layer(axum::error_handling::HandleErrorLayer::new(
+            |e: axum::BoxError| async move { tower_governor::errors::display_error(e) },
+        ))
         .layer(crate::middleware::rate_limit::rate_limit_layer());
 
     let refresh_limiter = tower::ServiceBuilder::new()
-        .layer(axum::error_handling::HandleErrorLayer::new(|e: axum::BoxError| async move {
-            tower_governor::errors::display_error(e)
-        }))
+        .layer(axum::error_handling::HandleErrorLayer::new(
+            |e: axum::BoxError| async move { tower_governor::errors::display_error(e) },
+        ))
         .layer(crate::middleware::rate_limit::rate_limit_layer())
         .layer(audit_layer.clone());
 
@@ -97,7 +97,10 @@ pub fn create_router(
             delete(crate::handlers::projects::delete_project).layer(state_change_limiter.clone()),
         )
         // Program routes
-        .route("/programs", get(crate::handlers::programs::list_all_programs))
+        .route(
+            "/programs",
+            get(crate::handlers::programs::list_all_programs),
+        )
         .route(
             "/projects/:id/programs",
             get(crate::handlers::programs::list_programs),

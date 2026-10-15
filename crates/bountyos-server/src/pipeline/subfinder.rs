@@ -202,7 +202,11 @@ pub async fn validate_domains_in_scope(
 
             let is_explicit_oos = rules.iter().any(|r| {
                 r.out_of_scope
-                    && crate::pipeline::scope_check::matches_scope(domain, &r.target, &r.target_type)
+                    && crate::pipeline::scope_check::matches_scope(
+                        domain,
+                        &r.target,
+                        &r.target_type,
+                    )
             });
 
             if is_explicit_oos {
@@ -210,7 +214,11 @@ pub async fn validate_domains_in_scope(
             } else {
                 rules.iter().any(|r| {
                     !r.out_of_scope
-                        && crate::pipeline::scope_check::matches_scope(domain, &r.target, &r.target_type)
+                        && crate::pipeline::scope_check::matches_scope(
+                            domain,
+                            &r.target,
+                            &r.target_type,
+                        )
                 })
             }
         };
@@ -344,13 +352,30 @@ pub async fn execute_subfinder_process(
 ) -> Result<SubfinderExecutionResult, SubfinderError> {
     let started_at = Utc::now();
 
+    // Helper for cross-platform execution (e.g. running .sh fixtures on Windows)
+    let create_cmd = |target_path: &Path| -> tokio::process::Command {
+        #[cfg(windows)]
+        {
+            if target_path.extension().and_then(|e| e.to_str()) == Some("sh") {
+                let bash = if std::path::Path::new(r"C:\Program Files\Git\bin\bash.exe").exists() {
+                    r"C:\Program Files\Git\bin\bash.exe"
+                } else {
+                    "bash"
+                };
+                let mut cmd = tokio::process::Command::new(bash);
+                cmd.arg(target_path);
+                return cmd;
+            }
+        }
+        tokio::process::Command::new(target_path)
+    };
+
     // Query tool version
     let tool_version = {
+        let mut ver_cmd = create_cmd(binary_path);
         let ver_out = tokio::time::timeout(
             std::time::Duration::from_secs(3),
-            tokio::process::Command::new(binary_path)
-                .arg("-version")
-                .output(),
+            ver_cmd.arg("-version").output(),
         )
         .await
         .ok()
@@ -365,7 +390,7 @@ pub async fn execute_subfinder_process(
         }
     };
 
-    let mut cmd = tokio::process::Command::new(binary_path);
+    let mut cmd = create_cmd(binary_path);
     for d in domains {
         cmd.arg("-d").arg(d);
     }
@@ -622,7 +647,9 @@ pub async fn run_managed_subfinder_job(
                 }
             }
         }
-        let _ = state.ws_tx().send(format!("[job:{}] Failed: {}", job_id, err_msg));
+        let _ = state
+            .ws_tx()
+            .send(format!("[job:{}] Failed: {}", job_id, err_msg));
         return;
     }
 
@@ -694,12 +721,24 @@ pub async fn run_managed_subfinder_job(
                 let mut flags_map = serde_json::Map::new();
                 flags_map.insert("tool".to_string(), serde_json::json!("subfinder"));
                 flags_map.insert("target".to_string(), serde_json::json!(target));
-                flags_map.insert("tool_version".to_string(), serde_json::json!(exec_res.tool_version));
-                flags_map.insert("exit_code".to_string(), serde_json::json!(exec_res.exit_code.unwrap_or(0)));
+                flags_map.insert(
+                    "tool_version".to_string(),
+                    serde_json::json!(exec_res.tool_version),
+                );
+                flags_map.insert(
+                    "exit_code".to_string(),
+                    serde_json::json!(exec_res.exit_code.unwrap_or(0)),
+                );
                 flags_map.insert("stdout".to_string(), serde_json::json!(exec_res.raw_stdout));
                 flags_map.insert("stderr".to_string(), serde_json::json!(exec_res.raw_stderr));
-                flags_map.insert("discovered_count".to_string(), serde_json::json!(exec_res.unique_subdomains.len()));
-                flags_map.insert("subdomains".to_string(), serde_json::json!(exec_res.unique_subdomains));
+                flags_map.insert(
+                    "discovered_count".to_string(),
+                    serde_json::json!(exec_res.unique_subdomains.len()),
+                );
+                flags_map.insert(
+                    "subdomains".to_string(),
+                    serde_json::json!(exec_res.unique_subdomains),
+                );
                 if let Some(ep) = evidence_path {
                     flags_map.insert("evidence_path".to_string(), serde_json::json!(ep));
                 }
@@ -727,10 +766,15 @@ pub async fn run_managed_subfinder_job(
                     }
                 }
             }
-            let _ = state.ws_tx().send(format!("[job:{}] Job timed out.", job_id));
+            let _ = state
+                .ws_tx()
+                .send(format!("[job:{}] Job timed out.", job_id));
         }
         Err(SubfinderError::NonZeroExit(code)) => {
-            let err_msg = format!("Subfinder process exited with non-zero status code: {}", code);
+            let err_msg = format!(
+                "Subfinder process exited with non-zero status code: {}",
+                code
+            );
             let mut lock = state.in_memory_jobs().write().await;
             if let Some(j) = lock.iter_mut().find(|j| j.id == job_id) {
                 j.status = "failed".to_string();
@@ -743,7 +787,10 @@ pub async fn run_managed_subfinder_job(
                     }
                 }
             }
-            let _ = state.ws_tx().send(format!("[job:{}] Job failed with exit code {}.", job_id, code));
+            let _ = state.ws_tx().send(format!(
+                "[job:{}] Job failed with exit code {}.",
+                job_id, code
+            ));
         }
         Err(e) => {
             let err_msg = e.to_string();
@@ -856,7 +903,10 @@ invalid..domain.com
         let res = parse_and_normalize_subfinder_output(raw, &parents);
         assert_eq!(
             res,
-            vec!["api.example.com".to_string(), "mail.example.com".to_string()]
+            vec![
+                "api.example.com".to_string(),
+                "mail.example.com".to_string()
+            ]
         );
     }
 
@@ -868,8 +918,8 @@ invalid..domain.com
 
     #[tokio::test]
     async fn test_mock_subfinder_fixture_execution() {
-        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/mock_subfinder.sh");
+        let fixture_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mock_subfinder.sh");
 
         if !fixture_path.exists() {
             return;
@@ -882,20 +932,34 @@ invalid..domain.com
 
         assert_eq!(res.status, "done");
         assert_eq!(res.exit_code, Some(0));
-        assert!(res.unique_subdomains.contains(&"api.example.com".to_string()));
-        assert!(res.unique_subdomains.contains(&"auth.example.com".to_string()));
-        assert!(res.unique_subdomains.contains(&"www.example.com".to_string()));
-        assert!(res.unique_subdomains.contains(&"blog.example.com".to_string()));
-        assert!(res.unique_subdomains.contains(&"dev.example.com".to_string()));
+        assert!(res
+            .unique_subdomains
+            .contains(&"api.example.com".to_string()));
+        assert!(res
+            .unique_subdomains
+            .contains(&"auth.example.com".to_string()));
+        assert!(res
+            .unique_subdomains
+            .contains(&"www.example.com".to_string()));
+        assert!(res
+            .unique_subdomains
+            .contains(&"blog.example.com".to_string()));
+        assert!(res
+            .unique_subdomains
+            .contains(&"dev.example.com".to_string()));
         // Verify deduplication: 'api.example.com' was listed twice in fixture
-        let api_count = res.unique_subdomains.iter().filter(|s| *s == "api.example.com").count();
+        let api_count = res
+            .unique_subdomains
+            .iter()
+            .filter(|s| *s == "api.example.com")
+            .count();
         assert_eq!(api_count, 1);
     }
 
     #[tokio::test]
     async fn test_mock_subfinder_fixture_error_exit() {
-        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/mock_subfinder.sh");
+        let fixture_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mock_subfinder.sh");
 
         if !fixture_path.exists() {
             return;
@@ -909,8 +973,8 @@ invalid..domain.com
 
     #[tokio::test]
     async fn test_mock_subfinder_fixture_timeout() {
-        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/mock_subfinder.sh");
+        let fixture_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mock_subfinder.sh");
 
         if !fixture_path.exists() {
             return;
@@ -925,8 +989,8 @@ invalid..domain.com
 
     #[tokio::test]
     async fn test_mock_subfinder_fixture_zero_results() {
-        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/mock_subfinder.sh");
+        let fixture_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mock_subfinder.sh");
 
         if !fixture_path.exists() {
             return;
@@ -979,7 +1043,10 @@ invalid..domain.com
         let tool_version = "2.6.7";
         let raw_stdout = "api.example.com\nauth.example.com\n";
         let raw_stderr = "[INF] completed\n";
-        let subdomains = vec!["api.example.com".to_string(), "auth.example.com".to_string()];
+        let subdomains = vec![
+            "api.example.com".to_string(),
+            "auth.example.com".to_string(),
+        ];
         let now = Utc::now();
 
         let output_path = write_evidence_artifacts(
@@ -1025,4 +1092,3 @@ invalid..domain.com
         assert!(matches!(res, Err(SubfinderError::OutOfScope(_, _))));
     }
 }
-

@@ -1,17 +1,8 @@
-use super::types::{
-    AnalysisResult,
-    DetectionSource,
-    SecurityFinding,
-    Severity,
-    ValidationStatus,
-};
+use super::types::{AnalysisResult, DetectionSource, SecurityFinding, Severity, ValidationStatus};
 
 use super::VulnerabilityAnalyzer;
 
-use crate::analysis::{
-    c::find_unbounded_stack_copies,
-    rules::detect_buffer_overflow,
-};
+use crate::analysis::{c::find_unbounded_stack_copies, rules::detect_buffer_overflow};
 
 #[derive(Clone)]
 pub struct RuleAnalyzer;
@@ -47,20 +38,15 @@ impl VulnerabilityAnalyzer for RuleAnalyzer {
 
             return Ok(AnalysisResult {
                 finding: SecurityFinding {
-                    vulnerability: Some(
-                        finding.vulnerability.to_string(),
-                    ),
+                    vulnerability: Some(finding.vulnerability.to_string()),
                     cwe: Some(finding.cwe.to_string()),
                     severity: Some(severity),
                     confidence: 1.0,
                     evidence: finding.evidence,
                     impact: Some(
-                        "The supplied source demonstrates the vulnerable operation."
-                            .to_string(),
+                        "The supplied source demonstrates the vulnerable operation.".to_string(),
                     ),
-                    remediation: Some(
-                        finding.remediation.to_string(),
-                    ),
+                    remediation: Some(finding.remediation.to_string()),
                     detection_source: DetectionSource::Rule,
                     validation_status: ValidationStatus::Confirmed,
                 },
@@ -75,9 +61,7 @@ impl VulnerabilityAnalyzer for RuleAnalyzer {
                 cwe: None,
                 severity: None,
                 confidence: 1.0,
-                evidence:
-                    "No deterministic security rule matched the supplied source."
-                        .to_string(),
+                evidence: "No deterministic security rule matched the supplied source.".to_string(),
                 impact: None,
                 remediation: None,
                 detection_source: DetectionSource::Rule,
@@ -89,13 +73,8 @@ impl VulnerabilityAnalyzer for RuleAnalyzer {
     }
 }
 
-fn analyze_source(
-    source: &str,
-) -> Vec<crate::analysis::rules::RuleFinding> {
+fn analyze_source(source: &str) -> Vec<crate::analysis::rules::RuleFinding> {
     let facts = find_unbounded_stack_copies(source);
 
-    facts
-        .iter()
-        .filter_map(detect_buffer_overflow)
-        .collect()
+    facts.iter().filter_map(detect_buffer_overflow).collect()
 }

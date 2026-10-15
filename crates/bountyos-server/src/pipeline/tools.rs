@@ -36,6 +36,13 @@ impl ToolRegistry {
                 if candidate.is_file() {
                     return Some(candidate);
                 }
+                #[cfg(windows)]
+                {
+                    let candidate_exe = dir.join(format!("{}.exe", name));
+                    if candidate_exe.is_file() {
+                        return Some(candidate_exe);
+                    }
+                }
             }
         }
 
@@ -147,10 +154,11 @@ mod tests {
 
     #[test]
     fn test_find_tool_path_env_override() {
-        std::env::set_var("TESTTOOL_PATH", "/bin/sh");
+        let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("cargo"));
+        std::env::set_var("TESTTOOL_PATH", &exe);
         let found = ToolRegistry::find_tool_path("testtool");
         assert!(found.is_some());
-        assert_eq!(found.unwrap(), PathBuf::from("/bin/sh"));
+        assert_eq!(found.unwrap(), exe);
         std::env::remove_var("TESTTOOL_PATH");
     }
 }

@@ -86,23 +86,33 @@ impl AppState {
         self.has_db
     }
 
-    pub fn in_memory_projects(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::project::Project>>> {
+    pub fn in_memory_projects(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::project::Project>>> {
         &self.in_memory_projects
     }
 
-    pub fn in_memory_programs(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::program::Program>>> {
+    pub fn in_memory_programs(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::program::Program>>> {
         &self.in_memory_programs
     }
 
-    pub fn in_memory_scope(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::scope::ScopeTarget>>> {
+    pub fn in_memory_scope(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::scope::ScopeTarget>>> {
         &self.in_memory_scope
     }
 
-    pub fn in_memory_subdomains(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::subdomain::Subdomain>>> {
+    pub fn in_memory_subdomains(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::subdomain::Subdomain>>> {
         &self.in_memory_subdomains
     }
 
-    pub fn in_memory_findings(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::finding::Finding>>> {
+    pub fn in_memory_findings(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::finding::Finding>>> {
         &self.in_memory_findings
     }
 
@@ -132,7 +142,9 @@ impl AppState {
             crate::models::project::Project {
                 id: uuid::Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap(),
                 name: "Client Pentest — Acme Corp".to_string(),
-                description: Some("Quarterly penetration test for Acme Corp infrastructure".to_string()),
+                description: Some(
+                    "Quarterly penetration test for Acme Corp infrastructure".to_string(),
+                ),
                 start_date: chrono::NaiveDate::from_ymd_opt(2025, 2, 15),
                 end_date: None,
                 active: true,
@@ -143,7 +155,9 @@ impl AppState {
             crate::models::project::Project {
                 id: uuid::Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap(),
                 name: "Personal Continuous Bug Bounty".to_string(),
-                description: Some("Ongoing personal bug bounty hunting across public programs".to_string()),
+                description: Some(
+                    "Ongoing personal bug bounty hunting across public programs".to_string(),
+                ),
                 start_date: chrono::NaiveDate::from_ymd_opt(2024, 6, 1),
                 end_date: None,
                 active: true,
@@ -168,24 +182,22 @@ impl AppState {
     fn default_hunters() -> Vec<crate::models::hunter::Hunter> {
         let admin_hash = crate::auth::password::hash_password("admin")
             .unwrap_or_else(|_| "$argon2id$v=19$m=65536,t=3,p=1$fake$fake".to_string());
-        vec![
-            crate::models::hunter::Hunter {
-                id: uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
-                username: "admin".to_string(),
-                display_name: "Admin Hunter".to_string(),
-                role: "admin".to_string(),
-                password_hash: admin_hash,
-                totp_secret: None,
-                totp_enabled: false,
-                discord_webhook: None,
-                slack_webhook: None,
-                email: Some("admin@bountyos.local".to_string()),
-                active: true,
-                last_login: None,
-                created_by: None,
-                created_at: chrono::Utc::now(),
-            },
-        ]
+        vec![crate::models::hunter::Hunter {
+            id: uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
+            username: "admin".to_string(),
+            display_name: "Admin Hunter".to_string(),
+            role: "admin".to_string(),
+            password_hash: admin_hash,
+            totp_secret: None,
+            totp_enabled: false,
+            discord_webhook: None,
+            slack_webhook: None,
+            email: Some("admin@bountyos.local".to_string()),
+            active: true,
+            last_login: None,
+            created_by: None,
+            created_at: chrono::Utc::now(),
+        }]
     }
 
     fn default_programs() -> Vec<crate::models::program::Program> {
@@ -378,12 +390,20 @@ impl AppState {
                 program_id: prog1_id,
                 subdomain_id: None,
                 title: "SSRF in api.uber.com/internal/health".to_string(),
-                description: Some("Server-Side Request Forgery vulnerability in internal health-check parameter.".to_string()),
+                description: Some(
+                    "Server-Side Request Forgery vulnerability in internal health-check parameter."
+                        .to_string(),
+                ),
                 severity: "critical".to_string(),
                 status: "new".to_string(),
                 finding_type: "ssrf".to_string(),
-                matched_at: Some("https://api.uber.com/internal/health?url=http://169.254.169.254/".to_string()),
-                curl_command: Some("curl -s https://api.uber.com/internal/health?url=http://169.254.169.254/".to_string()),
+                matched_at: Some(
+                    "https://api.uber.com/internal/health?url=http://169.254.169.254/".to_string(),
+                ),
+                curl_command: Some(
+                    "curl -s https://api.uber.com/internal/health?url=http://169.254.169.254/"
+                        .to_string(),
+                ),
                 tags: vec!["ssrf".to_string(), "cloud".to_string()],
                 assigned_to: None,
                 cvss_score: Some(9.1),
@@ -400,12 +420,17 @@ impl AppState {
                 program_id: prog1_id,
                 subdomain_id: None,
                 title: "SQLi at /rides/search?q=".to_string(),
-                description: Some("Boolean-based blind SQL injection in rides search query parameter.".to_string()),
+                description: Some(
+                    "Boolean-based blind SQL injection in rides search query parameter."
+                        .to_string(),
+                ),
                 severity: "high".to_string(),
                 status: "validated".to_string(),
                 finding_type: "sqli".to_string(),
                 matched_at: Some("https://www.uber.com/rides/search?q=' OR 1=1--".to_string()),
-                curl_command: Some("curl -s 'https://www.uber.com/rides/search?q=%27%20OR%201=1--'".to_string()),
+                curl_command: Some(
+                    "curl -s 'https://www.uber.com/rides/search?q=%27%20OR%201=1--'".to_string(),
+                ),
                 tags: vec!["sqli".to_string(), "database".to_string()],
                 assigned_to: None,
                 cvss_score: Some(8.2),
@@ -500,7 +525,10 @@ impl AppState {
                     "stdout": "[nuclei] Starting vulnerability detection against 10.0.0.0/24...\n[nuclei] Error connecting to target network.",
                     "stderr": "FATAL: Connection timeout to subnet gateway 10.0.0.1. Network unreachable."
                 })),
-                error_log: Some("FATAL: Connection timeout to subnet gateway 10.0.0.1. Network unreachable.".to_string()),
+                error_log: Some(
+                    "FATAL: Connection timeout to subnet gateway 10.0.0.1. Network unreachable."
+                        .to_string(),
+                ),
                 started_at: Some(now - chrono::Duration::hours(2)),
                 completed_at: Some(now - chrono::Duration::hours(2) + chrono::Duration::minutes(4)),
                 created_at: now - chrono::Duration::hours(2),
@@ -540,16 +568,23 @@ impl AppState {
                     "stdout": "[subfinder] Gathering passive OSINT...",
                     "stderr": "TIMEOUT: Operation exceeded execution limit of 600 seconds. Process killed."
                 })),
-                error_log: Some("TIMEOUT: Operation exceeded execution limit of 600 seconds. Process killed.".to_string()),
+                error_log: Some(
+                    "TIMEOUT: Operation exceeded execution limit of 600 seconds. Process killed."
+                        .to_string(),
+                ),
                 started_at: Some(now - chrono::Duration::hours(8)),
-                completed_at: Some(now - chrono::Duration::hours(8) + chrono::Duration::minutes(10)),
+                completed_at: Some(
+                    now - chrono::Duration::hours(8) + chrono::Duration::minutes(10),
+                ),
                 created_at: now - chrono::Duration::hours(8),
                 updated_at: now - chrono::Duration::hours(8) + chrono::Duration::minutes(10),
             },
         ]
     }
 
-    pub fn in_memory_jobs(&self) -> &Arc<tokio::sync::RwLock<Vec<crate::models::scan_job::ScanJob>>> {
+    pub fn in_memory_jobs(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::scan_job::ScanJob>>> {
         &self.in_memory_jobs
     }
 
