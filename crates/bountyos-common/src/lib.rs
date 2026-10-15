@@ -8,6 +8,7 @@ pub mod recon_pipeline;
 pub mod scope;
 pub mod tool_runner;
 pub mod types;
+pub mod validation_engine;
 
 pub use engine::*;
 pub use errors::*;
@@ -19,3 +20,4 @@ pub use recon_pipeline::*;
 pub use scope::*;
 pub use tool_runner::*;
 pub use types::*;
+pub use validation_engine::*;
