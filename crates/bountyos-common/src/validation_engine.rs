@@ -1,7 +1,7 @@
 use crate::errors::BountyError;
-use crate::findings_engine::{CandidateFindingSpec, FindingsEngine};
+use crate::findings_engine::FindingsEngine;
 use crate::ids::FindingId;
-use crate::models::{Evidence, EvidenceType, Finding, FindingLifecycleStatus};
+use crate::models::{Evidence, EvidenceType, FindingLifecycleStatus};
 use crate::scope::ScopePolicy;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -121,6 +121,7 @@ pub struct ValidationResult {
 // 4. Validation Orchestrator Engine
 // ============================================================================
 
+#[derive(Clone)]
 pub struct ValidationEngine {
     findings_engine: FindingsEngine,
 }
@@ -346,8 +347,9 @@ impl ValidationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::findings_engine::EvidenceStore;
+    use crate::findings_engine::{CandidateFindingSpec, EvidenceStore};
     use crate::ids::ProgramId;
+    use crate::models::Finding;
     use crate::types::{ScopeType, Severity};
 
     struct MockDriver {

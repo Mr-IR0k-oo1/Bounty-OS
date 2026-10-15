@@ -1,6 +1,6 @@
 use crate::errors::BountyError;
 use crate::ids::*;
-use crate::types::{Platform, ScopeType, Severity};
+pub use crate::types::{Platform, ScopeType, Severity};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
