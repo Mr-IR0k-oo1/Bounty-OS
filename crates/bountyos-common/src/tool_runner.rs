@@ -4,7 +4,7 @@ use crate::scope::ScopePolicy;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -367,6 +367,7 @@ impl ToolRunner {
 mod tests {
     use super::*;
     use crate::types::ScopeType;
+    use std::path::PathBuf;
 
     fn test_policy() -> ScopePolicy {
         let mut policy = ScopePolicy::new(ProgramId::new());

@@ -1,6 +1,6 @@
 use crate::errors::BountyError;
 use crate::ids::{JobId, ProgramId};
-use crate::models::{Job, JobCategory, JobExecutionState};
+use crate::models::{Job, JobCategory};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -165,6 +165,7 @@ impl JobEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::JobExecutionState;
     use std::time::Duration;
 
     #[tokio::test]
