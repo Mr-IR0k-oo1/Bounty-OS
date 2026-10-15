@@ -177,7 +177,7 @@ impl FromStr for ProjectStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScopeType {
     Domain,
     Ip,
