@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Globe, Server, Link as LinkIcon, Image as ImageIcon, ExternalLink, AlertCircle, RefreshCw } from "lucide-react"
 import { api } from "@/lib/api"
-import type { Subdomain, DiscoveredUrl } from "@/lib/types"
+import type { Subdomain, DiscoveredUrl, Port } from "@/lib/types"
 
 type ReconTab = "subdomains" | "ports" | "urls" | "screenshots"
 
@@ -18,6 +18,7 @@ export default function ProgramReconPage() {
 
   const [subdomains, setSubdomains] = useState<Subdomain[]>([])
   const [urls, setUrls] = useState<DiscoveredUrl[]>([])
+  const [ports, setPorts] = useState<Port[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,12 +26,14 @@ export default function ProgramReconPage() {
     setLoading(true)
     setError(null)
     try {
-      const [subs, urlList] = await Promise.all([
-        api.listSubdomains(programId),
-        api.listUrls(programId),
+      const [subs, urlList, portList] = await Promise.all([
+        api.listSubdomains(programId).catch(() => []),
+        api.listUrls(programId).catch(() => []),
+        api.listProgramPorts(programId).catch(() => []),
       ])
       setSubdomains(subs)
       setUrls(urlList)
+      setPorts(portList)
     } catch (e: any) {
       setError(e.message || "Failed to load recon data")
     } finally {
@@ -44,7 +47,7 @@ export default function ProgramReconPage() {
 
   const tabs: { key: ReconTab; label: string; icon: React.ReactNode }[] = [
     { key: "subdomains", label: `Subdomains (${subdomains.length})`, icon: <Globe className="w-3.5 h-3.5" /> },
-    { key: "ports", label: "Ports", icon: <Server className="w-3.5 h-3.5" /> },
+    { key: "ports", label: `Ports & Services (${ports.length})`, icon: <Server className="w-3.5 h-3.5" /> },
     { key: "urls", label: `URLs (${urls.length})`, icon: <LinkIcon className="w-3.5 h-3.5" /> },
     { key: "screenshots", label: "Screenshots", icon: <ImageIcon className="w-3.5 h-3.5" /> },
   ]
@@ -148,8 +151,49 @@ export default function ProgramReconPage() {
           )}
 
           {activeTab === "ports" && (
-            <Card className="p-12 text-center bg-bg-elevated border border-border text-xs text-text-muted">
-              No open port records identified yet.
+            <Card className="bg-bg-elevated border border-border overflow-hidden">
+              {ports.length === 0 ? (
+                <div className="p-12 text-center text-xs text-text-muted">
+                  No open network ports or services recorded yet for this program.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-bg-subtle text-text-muted uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Port / Protocol</th>
+                      <th className="px-4 py-2.5 text-left">Host / IP</th>
+                      <th className="px-4 py-2.5 text-left">Service</th>
+                      <th className="px-4 py-2.5 text-left">State</th>
+                      <th className="px-4 py-2.5 text-left">Banner</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {ports.map((p) => (
+                      <tr key={p.id} className="hover:bg-bg-overlay">
+                        <td className="px-4 py-2.5 font-mono text-xs text-primary font-semibold">
+                          {p.port} / {p.protocol.toUpperCase()}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-text-secondary">
+                          {p.ip || "-"}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="badge bg-primary/10 text-primary text-xs">
+                            {p.service || "unknown"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="badge bg-accent-muted text-accent text-xs">
+                            {p.state || "open"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary text-xs max-w-[280px] truncate">
+                          {p.banner || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </Card>
           )}
 

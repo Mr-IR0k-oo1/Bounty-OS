@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-10-21T16:36:19.220Z",
+  "concurrency": 3,
+  "totalDurationMs": 34701,
+  "totalJobs": 9,
+  "avgQueueTimeMs": 2038.11,
+  "throughputInvestigationsPerMin": 5.19,
+  "jobThroughputPerMin": 15.56,
+  "peakDbConns": 12,
+  "allSucceeded": true,
+  "results": [
+    {
+      "investigationIndex": 1,
+      "programId": "b9fdfb42-01db-4113-bbfd-7ed86668c4a3",
+      "durationMs": 30753,
+      "jobs": [
+        {
+          "tool": "httpx",
+          "queueTimeMs": 26,
+          "durationMs": 5896,
+          "status": "done"
+        },
+        {
+          "tool": "katana",
+          "queueTimeMs": 4061,
+          "durationMs": 14384,
+          "status": "done"
+        },
+        {
+          "tool": "dalfox",
+          "queueTimeMs": 2035,
+          "durationMs": 4261,
+          "status": "done"
+        }
+      ],
+      "findingsCount": 1,
+      "endpointsCount": 4,
+      "success": true
+    },
+    {
+      "investigationIndex": 2,
+      "programId": "da7a52b9-bb3f-49ad-9cb3-468f960c42e4",
+      "durationMs": 28519,
+      "jobs": [
+        {
+          "tool": "httpx",
+          "queueTimeMs": 35,
+          "durationMs": 5877,
+          "status": "done"
+        },
+        {
+          "tool": "katana",
+          "queueTimeMs": 2014,
+          "durationMs": 14400,
+          "status": "done"
+        },
+        {
+          "tool": "dalfox",
+          "queueTimeMs": 4067,
+          "durationMs": 2034,
+          "status": "done"
+        }
+      ],
+      "findingsCount": 1,
+      "endpointsCount": 4,
+      "success": true
+    },
+    {
+      "investigationIndex": 3,
+      "programId": "825f1215-c8ca-4bbd-8f03-39a6e693a8cc",
+      "durationMs": 30743,
+      "jobs": [
+        {
+          "tool": "httpx",
+          "queueTimeMs": 24,
+          "durationMs": 5896,
+          "status": "done"
+        },
+        {
+          "tool": "katana",
+          "queueTimeMs": 2016,
+          "durationMs": 14405,
+          "status": "done"
+        },
+        {
+          "tool": "dalfox",
+          "queueTimeMs": 4065,
+          "durationMs": 4262,
+          "status": "done"
+        }
+      ],
+      "findingsCount": 1,
+      "endpointsCount": 4,
+      "success": true
+    }
+  ]
+}

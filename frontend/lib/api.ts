@@ -122,6 +122,7 @@ export const api = {
 
   // Ports
   listPorts: (subdomainId: string) => request<import('./types').Port[]>(`/subdomains/${subdomainId}/ports`),
+  listProgramPorts: (programId: string) => request<import('./types').Port[]>(`/programs/${programId}/ports`),
 
   listJobs: (params?: { program_id?: string; status?: string }) => {
     const sp = new URLSearchParams()

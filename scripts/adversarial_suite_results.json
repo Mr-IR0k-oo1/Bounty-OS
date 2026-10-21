@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-10-21T16:24:18.302Z",
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "results": [
+    {
+      "phase": "Auth",
+      "name": "Acquire JWT",
+      "status": "PASS",
+      "details": "Operator token active",
+      "timestamp": "2026-10-21T16:24:13.315Z"
+    },
+    {
+      "phase": "Scope",
+      "name": "API: Reject Unlisted Target",
+      "status": "PASS",
+      "details": "HTTP 422",
+      "timestamp": "2026-10-21T16:24:13.414Z"
+    },
+    {
+      "phase": "Scope",
+      "name": "API: Reject Explicit OOS Target",
+      "status": "PASS",
+      "details": "HTTP 422",
+      "timestamp": "2026-10-21T16:24:13.424Z"
+    },
+    {
+      "phase": "Scope",
+      "name": "API: Reject Cloud Metadata IP",
+      "status": "PASS",
+      "details": "HTTP 422",
+      "timestamp": "2026-10-21T16:24:13.436Z"
+    },
+    {
+      "phase": "Injection",
+      "name": "Reject Shell Metacharacters (9 vectors)",
+      "status": "PASS",
+      "details": "9/9 rejected",
+      "timestamp": "2026-10-21T16:24:13.490Z"
+    },
+    {
+      "phase": "Traversal",
+      "name": "Evidence Path Traversal Block (5 vectors)",
+      "status": "PASS",
+      "details": "5/5 blocked",
+      "timestamp": "2026-10-21T16:24:13.506Z"
+    },
+    {
+      "phase": "Isolation",
+      "name": "Cross-Program Findings Leakage",
+      "status": "PASS",
+      "details": "Program B cannot see Program A finding",
+      "timestamp": "2026-10-21T16:24:13.527Z"
+    },
+    {
+      "phase": "Isolation",
+      "name": "Finding Identity Provenance",
+      "status": "PASS",
+      "details": "Locked to program 04cc6804-1c9c-4509-b336-4d75e664d316",
+      "timestamp": "2026-10-21T16:24:13.536Z"
+    },
+    {
+      "phase": "Auth",
+      "name": "Reject Empty Authorization Header",
+      "status": "PASS",
+      "details": "HTTP 401",
+      "timestamp": "2026-10-21T16:24:13.540Z"
+    },
+    {
+      "phase": "Auth",
+      "name": "Reject Malformed / Forged JWT",
+      "status": "PASS",
+      "details": "HTTP 401",
+      "timestamp": "2026-10-21T16:24:13.545Z"
+    },
+    {
+      "phase": "Auth",
+      "name": "Reject Invalid Signature Token",
+      "status": "PASS",
+      "details": "HTTP 401",
+      "timestamp": "2026-10-21T16:24:13.551Z"
+    },
+    {
+      "phase": "Whitelist",
+      "name": "Reject Unwhitelisted Binaries (8 vectors)",
+      "status": "PASS",
+      "details": "8/8 rejected",
+      "timestamp": "2026-10-21T16:24:13.604Z"
+    },
+    {
+      "phase": "LLM Defense",
+      "name": "Evidence Prompt Injection Resilience",
+      "status": "PASS",
+      "details": "Retained severity: critical",
+      "timestamp": "2026-10-21T16:24:13.619Z"
+    },
+    {
+      "phase": "Verifier",
+      "name": "Deterministic Verification Without Evidence",
+      "status": "PASS",
+      "details": "Rejected unevidenced confirmation (POLICY_DENIED)",
+      "timestamp": "2026-10-21T16:24:13.637Z"
+    },
+    {
+      "phase": "Resilience",
+      "name": "Offline VulnLLM Graceful Fallback",
+      "status": "PASS",
+      "details": "HTTP 501",
+      "timestamp": "2026-10-21T16:24:13.654Z"
+    },
+    {
+      "phase": "Resilience",
+      "name": "Non-Zero Exit Code Job Completion",
+      "status": "PASS",
+      "details": "Job status: done",
+      "timestamp": "2026-10-21T16:24:14.337Z"
+    },
+    {
+      "phase": "Resilience",
+      "name": "No Orphaned Running Jobs",
+      "status": "PASS",
+      "details": "0 stuck jobs",
+      "timestamp": "2026-10-21T16:24:14.358Z"
+    },
+    {
+      "phase": "Concurrency",
+      "name": "Enqueue 4 Parallel Jobs",
+      "status": "PASS",
+      "details": "4/4 jobs created",
+      "timestamp": "2026-10-21T16:24:14.509Z"
+    },
+    {
+      "phase": "Concurrency",
+      "name": "Parallel Jobs Finished Without Deadlock",
+      "status": "PASS",
+      "details": "Completed in 3944ms",
+      "timestamp": "2026-10-21T16:24:18.302Z"
+    }
+  ]
+}

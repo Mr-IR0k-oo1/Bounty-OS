@@ -133,14 +133,19 @@ export interface Subdomain {
 
 export interface Port {
   id: string
-  subdomainId: string
+  subdomainId?: string | null
+  subdomain_id?: string | null
+  program_id?: string | null
+  ip?: string
   port: number
   protocol: string
   service: string | null
-  version: string | null
-  banner: string | null
-  firstSeen: string
-  lastSeen: string
+  state?: string | null
+  version?: string | null
+  banner?: string | null
+  firstSeen?: string
+  lastSeen?: string
+  created_at?: string
 }
 
 export interface DiscoveredUrl {

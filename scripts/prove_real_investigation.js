@@ -146,7 +146,7 @@ async function runInvestigation() {
     body: JSON.stringify({
       program_id: programId,
       tool: 'httpx',
-      target: TARGET_HOST,
+      target: TARGET_URL,
     }),
   });
   const httpxJobId = httpxJobReq.data.id;
