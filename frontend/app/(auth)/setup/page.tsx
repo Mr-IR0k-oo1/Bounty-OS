@@ -50,28 +50,21 @@ export default function SetupPage() {
     setLoading(true)
 
     try {
-      const res = await fetch("/api/auth/setup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: form.username,
-          display_name: form.displayName,
-          password: form.password,
-        }),
+      const { api } = await import("@/lib/api")
+      const data = await api.setup({
+        username: form.username,
+        display_name: form.displayName,
+        password: form.password,
       })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.message || "Setup failed")
-        return
+      if (data.access_token) {
+        setTokens(data.access_token, data.refresh_token)
       }
-
       setQrCode(data.qr_code_url || "")
       setSecret(data.secret || "")
       setStep("2fa")
-    } catch {
-      setError("Network error. Please try again.")
+    } catch (err: any) {
+      setError(err?.message || "Setup failed. Please check details and try again.")
     } finally {
       setLoading(false)
     }
@@ -82,7 +75,6 @@ export default function SetupPage() {
   }
 
   function handleFinish() {
-    setTokens("setup-token", "setup-refresh-token")
     router.push("/dashboard")
   }
 

@@ -46,6 +46,19 @@ services:
       - /app/node_modules
     command: npm run dev
 
+  mcp:
+    extends:
+      service: mcp
+      file: docker-compose.yml
+    environment:
+      PORT: 3005
+      MCP_TRANSPORT: sse
+      BOUNTYOS_API_URL: http://server:8000
+    volumes:
+      - ./mcp:/app
+      - /app/node_modules
+    command: npm run dev
+
   nginx:
     extends:
       service: nginx

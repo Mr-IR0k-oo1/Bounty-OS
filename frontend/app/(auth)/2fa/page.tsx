@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { ShieldAlert } from "lucide-react"
-import { setTokens } from "@/lib/auth"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function TwoFactorPage() {
   const router = useRouter()
+  const { verify2fa } = useAuth()
   const [code, setCode] = useState(["", "", "", "", "", ""])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -58,24 +59,10 @@ export default function TwoFactorPage() {
 
     setLoading(true)
     try {
-      let data: any = {}
-      try {
-        const res = await fetch("/api/auth/2fa/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: token }),
-        })
-        if (res.ok) {
-          data = await res.json()
-        }
-      } catch {
-        // demo fallback
-      }
-
-      setTokens(data.access_token || "demo-2fa-access-token", data.refresh_token || "demo-2fa-refresh-token")
+      await verify2fa(token)
       router.push("/dashboard")
-    } catch {
-      setError("Verification failed. Please try again.")
+    } catch (err: any) {
+      setError(err?.message || "Verification code is invalid or has expired. Please try again.")
     } finally {
       setLoading(false)
     }

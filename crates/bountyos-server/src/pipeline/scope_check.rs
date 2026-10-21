@@ -29,23 +29,50 @@ pub fn matches_scope(target: &str, rule: &str, target_type: &str) -> bool {
         return true;
     }
 
+    if target_type == "url" {
+        return target.starts_with(&rule) || rule.starts_with(&target);
+    }
+
+    // Extract bare host from target if it contains URL scheme, port, or path
+    let bare_target = if target.starts_with("http://") || target.starts_with("https://") {
+        target
+            .split("://")
+            .nth(1)
+            .unwrap_or(&target)
+            .split('/')
+            .next()
+            .unwrap_or(&target)
+            .split(':')
+            .next()
+            .unwrap_or(&target)
+    } else if let Some((h, _)) = target.split_once(':') {
+        h
+    } else if let Some((h, _)) = target.split_once('/') {
+        h
+    } else {
+        &target
+    };
+
+    if bare_target == rule {
+        return true;
+    }
+
     match target_type {
         "wildcard" => {
             let base = rule.trim_start_matches("*.").trim_start_matches('.');
-            target == base || target.ends_with(&format!(".{}", base))
+            bare_target == base || bare_target.ends_with(&format!(".{}", base))
         }
         "domain" => {
             if rule.starts_with("*.") || rule.starts_with('.') {
                 let base = rule.trim_start_matches("*.").trim_start_matches('.');
-                target == base || target.ends_with(&format!(".{}", base))
+                bare_target == base || bare_target.ends_with(&format!(".{}", base))
             } else {
-                target == rule
+                bare_target == rule
             }
         }
-        "cidr" => ip_in_cidr(&target, &rule),
-        "ip" => target == rule,
-        "url" => target.starts_with(&rule),
-        _ => target == rule,
+        "cidr" => ip_in_cidr(bare_target, &rule),
+        "ip" => bare_target == rule,
+        _ => bare_target == rule,
     }
 }
 

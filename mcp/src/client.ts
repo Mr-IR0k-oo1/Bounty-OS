@@ -1,0 +1,502 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface Program {
+  id: string;
+  project_id: string;
+  name: string;
+  slug: string;
+  platform: string;
+  program_url?: string;
+  active: boolean;
+  active_approved: boolean;
+  rescan_interval_hrs?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScopeTarget {
+  id: string;
+  program_id: string;
+  target: string;
+  target_type: string;
+  out_of_scope: boolean;
+  source?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface Subdomain {
+  id: string;
+  program_id: string;
+  subdomain: string;
+  ip_address?: string;
+  status_code?: number;
+  title?: string;
+  web_server?: string;
+  tech?: string[];
+  screenshot_path?: string;
+  cname?: string;
+  ports?: number[];
+  source?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PortService {
+  id: string;
+  program_id: string;
+  subdomain_id?: string;
+  ip: string;
+  port: number;
+  protocol: string;
+  service?: string;
+  state: string;
+  banner?: string;
+  created_at: string;
+}
+
+export interface UrlEndpoint {
+  id: string;
+  program_id: string;
+  subdomain_id?: string;
+  url: string;
+  status_code?: number;
+  content_type?: string;
+  content_length?: number;
+  source: string;
+  created_at: string;
+}
+
+export interface Finding {
+  id: string;
+  program_id: string;
+  subdomain_id?: string;
+  title: string;
+  description?: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  status: "new" | "triaged" | "validated" | "reported" | "resolved" | "candidate" | "unverified" | "likely" | "confirmed" | "false_positive";
+  finding_type?: string;
+  matched_at?: string;
+  curl_command?: string;
+  tags?: string[];
+  assigned_to?: string;
+  cvss_score?: number;
+  kanban_column?: string;
+  created_at: string;
+  updated_at: string;
+  llm_triage_json?: any;
+  llm_confidence?: number;
+  llm_triaged_at?: string;
+}
+
+export interface Job {
+  id: string;
+  program_id: string;
+  subdomain_id?: string;
+  stage: number;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  target?: string;
+  flags?: any;
+  error_log?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface JobLogs {
+  job_id: string;
+  stdout: string;
+  stderr: string;
+  exit_code?: number;
+  status: string;
+}
+
+export interface JobArtifacts {
+  job_id: string;
+  available: boolean;
+  files: string[];
+  evidence_path?: string;
+  message?: string;
+}
+
+export interface ReportData {
+  program_id: string;
+  program_name: string;
+  generated_at: string;
+  total_findings: number;
+  severity_breakdown: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  markdown: string;
+}
+
+export class BountyOSClient {
+  private baseUrl: string;
+  private token: string | null = null;
+  private refreshToken: string | null = null;
+  private username: string;
+  private password: string;
+
+  constructor(options?: {
+    baseUrl?: string;
+    token?: string;
+    username?: string;
+    password?: string;
+  }) {
+    this.baseUrl = (
+      options?.baseUrl ||
+      process.env.BOUNTYOS_API_URL ||
+      process.env.BOUNTYOS_URL ||
+      "http://127.0.0.1:8000"
+    ).replace(/\/$/, "");
+
+    this.token = options?.token || process.env.BOUNTYOS_API_TOKEN || null;
+    this.username = options?.username || process.env.BOUNTYOS_USERNAME || "admin";
+    this.password = options?.password || process.env.BOUNTYOS_PASSWORD || "admin";
+  }
+
+  private async ensureAuthenticated(): Promise<string> {
+    if (this.token) {
+      return this.token;
+    }
+
+    const loginUrls = [
+      `${this.baseUrl}/api/auth/login`,
+      `${this.baseUrl}/auth/login`,
+      `http://127.0.0.1:8000/api/auth/login`,
+      `http://127.0.0.1:3000/api/auth/login`,
+    ];
+
+    let lastError: Error | null = null;
+    for (const url of loginUrls) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: this.username,
+            password: this.password,
+          }),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as AuthTokens;
+          this.token = data.access_token;
+          this.refreshToken = data.refresh_token;
+          if (url.includes("/api/auth/login")) {
+            this.baseUrl = url.replace(/\/auth\/login$/, "");
+          }
+          return this.token;
+        }
+      } catch (e: any) {
+        lastError = e;
+      }
+    }
+
+    throw new Error(
+      `Failed to authenticate with BountyOS: ${lastError ? lastError.message : "Invalid credentials"}`
+    );
+  }
+
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = await this.ensureAuthenticated();
+
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    if (options.body && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    // Auto-prefix with /api if not present
+    let path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    if (!path.startsWith("/api") && !this.baseUrl.endsWith("/api")) {
+      path = `/api${path}`;
+    }
+
+    let res = await fetch(`${this.baseUrl}${path}`, {
+      ...options,
+      headers,
+    });
+
+    if (res.status === 401 && this.refreshToken) {
+      try {
+        const refreshPath = this.baseUrl.endsWith("/api") ? "/auth/refresh" : "/api/auth/refresh";
+        const refreshRes = await fetch(`${this.baseUrl}${refreshPath}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: this.refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const refreshed = (await refreshRes.json()) as AuthTokens;
+          this.token = refreshed.access_token;
+          this.refreshToken = refreshed.refresh_token;
+          headers["Authorization"] = `Bearer ${this.token}`;
+          res = await fetch(`${this.baseUrl}${path}`, {
+            ...options,
+            headers,
+          });
+        }
+      } catch {
+        // Ignore refresh error
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`BountyOS API error [${res.status}]: ${errText || res.statusText}`);
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return (await res.json()) as T;
+    }
+    return (await res.text()) as unknown as T;
+  }
+
+  // --- Project Operations ---
+
+  async listProjects(): Promise<any[]> {
+    return this.request<any[]>("/projects");
+  }
+
+  async createProject(name: string, description?: string): Promise<any> {
+    return this.request<any>("/projects", {
+      method: "POST",
+      body: JSON.stringify({ name, description }),
+    });
+  }
+
+  // --- Program / Investigation Operations ---
+
+  async listPrograms(): Promise<Program[]> {
+    return this.request<Program[]>("/programs");
+  }
+
+  async getProgram(id: string): Promise<Program> {
+    return this.request<Program>(`/programs/${id}`);
+  }
+
+  async createProgram(
+    projectId: string,
+    name: string,
+    platform = "self-hosted",
+    url?: string
+  ): Promise<Program> {
+    return this.request<Program>(`/projects/${projectId}/programs`, {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        platform,
+        program_url: url,
+        active: true,
+        active_approved: true,
+      }),
+    });
+  }
+
+  async updateProgram(id: string, payload: Partial<Program>): Promise<Program> {
+    return this.request<Program>(`/programs/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async approveProgram(id: string): Promise<Program> {
+    return this.request<Program>(`/programs/${id}/approve`, {
+      method: "POST",
+    });
+  }
+
+  // --- Scope Operations ---
+
+  async listScope(programId: string): Promise<ScopeTarget[]> {
+    return this.request<ScopeTarget[]>(`/programs/${programId}/scope`);
+  }
+
+  async addScopeTarget(
+    programId: string,
+    target: {
+      target: string;
+      target_type?: string;
+      out_of_scope?: boolean;
+      source?: string;
+      notes?: string;
+    }
+  ): Promise<ScopeTarget> {
+    return this.request<ScopeTarget>(`/programs/${programId}/scope`, {
+      method: "POST",
+      body: JSON.stringify({
+        target: target.target,
+        target_type: target.target_type || "domain",
+        out_of_scope: target.out_of_scope ?? false,
+        source: target.source || "mcp",
+        notes: target.notes || null,
+      }),
+    });
+  }
+
+  // --- Asset (Subdomain) Operations ---
+
+  async listSubdomains(programId: string): Promise<Subdomain[]> {
+    return this.request<Subdomain[]>(`/programs/${programId}/subdomains`);
+  }
+
+  async getSubdomain(id: string): Promise<Subdomain> {
+    return this.request<Subdomain>(`/subdomains/${id}`);
+  }
+
+  // --- Service (Port) Operations ---
+
+  async listPorts(subdomainId: string): Promise<PortService[]> {
+    return this.request<PortService[]>(`/subdomains/${subdomainId}/ports`);
+  }
+
+  // --- Endpoint (URL) Operations ---
+
+  async listUrls(programId: string, subdomainId?: string): Promise<UrlEndpoint[]> {
+    const q = subdomainId ? `?subdomain_id=${subdomainId}` : "";
+    return this.request<UrlEndpoint[]>(`/programs/${programId}/urls${q}`);
+  }
+
+  // --- Scan Job Operations ---
+
+  async listJobs(params?: { program_id?: string; status?: string }): Promise<Job[]> {
+    const qParts: string[] = [];
+    if (params?.program_id) qParts.push(`program_id=${params.program_id}`);
+    if (params?.status) qParts.push(`status=${params.status}`);
+    const q = qParts.length ? `?${qParts.join("&")}` : "";
+    return this.request<Job[]>(`/jobs${q}`);
+  }
+
+  async getJob(id: string): Promise<Job> {
+    return this.request<Job>(`/jobs/${id}`);
+  }
+
+  async createJob(payload: {
+    program_id: string;
+    tool: string;
+    target: string;
+    stage?: number;
+    flags?: any;
+  }): Promise<Job> {
+    return this.request<Job>("/jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async cancelJob(id: string): Promise<Job> {
+    return this.request<Job>(`/jobs/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getJobLogs(id: string): Promise<JobLogs> {
+    return this.request<JobLogs>(`/jobs/${id}/logs`);
+  }
+
+  async getJobArtifacts(id: string): Promise<JobArtifacts> {
+    return this.request<JobArtifacts>(`/jobs/${id}/artifacts`);
+  }
+
+  // --- Finding Operations ---
+
+  async listFindings(params?: {
+    program_id?: string;
+    severity?: string;
+    status?: string;
+  }): Promise<Finding[]> {
+    const qParts: string[] = [];
+    if (params?.program_id) qParts.push(`program_id=${params.program_id}`);
+    if (params?.severity) qParts.push(`severity=${params.severity}`);
+    if (params?.status) qParts.push(`status=${params.status}`);
+    const q = qParts.length ? `?${qParts.join("&")}` : "";
+    return this.request<Finding[]>(`/findings${q}`);
+  }
+
+  async getFinding(id: string): Promise<Finding> {
+    return this.request<Finding>(`/findings/${id}`);
+  }
+
+  async createFinding(payload: {
+    program_id: string;
+    title: string;
+    description?: string;
+    severity?: string;
+    status?: string;
+    matched_at?: string;
+    finding_type?: string;
+    tags?: string[];
+    cvss_score?: number;
+  }): Promise<Finding> {
+    return this.request<Finding>("/findings", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateFinding(
+    id: string,
+    payload: {
+      title?: string;
+      description?: string;
+      severity?: string;
+      status?: string;
+      cvss_score?: number;
+      kanban_column?: string;
+    }
+  ): Promise<Finding> {
+    return this.request<Finding>(`/findings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async validateFinding(id: string): Promise<Finding> {
+    return this.request<Finding>(`/findings/${id}/validate`, {
+      method: "POST",
+    });
+  }
+
+  async triageFinding(id: string): Promise<any> {
+    return this.request<any>(`/findings/${id}/triage`, {
+      method: "POST",
+    });
+  }
+
+  async getFindingTriage(id: string): Promise<any> {
+    return this.request<any>(`/findings/${id}/triage`);
+  }
+
+  // --- Report Operations ---
+
+  async generateReport(programId: string): Promise<ReportData> {
+    return this.request<ReportData>(`/programs/${programId}/report`);
+  }
+
+  // --- Static Evidence Operations ---
+
+  async getEvidence(evidencePath: string): Promise<string> {
+    const clean = evidencePath.replace(/^\/+/, "");
+    return this.request<string>(`/evidence/${clean}`);
+  }
+}

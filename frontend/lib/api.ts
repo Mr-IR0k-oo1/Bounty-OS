@@ -22,17 +22,37 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   login: (username: string, password: string) =>
-    request<{ access_token: string; refresh_token: string; requires_2fa: boolean }>('/auth/login', {
+    request<{ access_token: string; refresh_token: string; requires_2fa: boolean; temp_token?: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request<import('./types').Hunter>('/auth/me'),
-  setup2fa: () => request<{ secret: string; qr_code_url: string }>('/auth/2fa/setup', { method: 'POST' }),
-  verify2fa: (code: string) =>
+  setup: (data: { username: string; display_name: string; password: string }) =>
+    request<{ message: string; secret: string; qr_code_url: string; access_token: string; refresh_token: string }>('/auth/setup', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  setup2fa: (password: string) =>
+    request<{ secret: string; qr_code_url: string }>('/auth/2fa/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  verify2fa: (code: string, tempToken?: string) =>
     request<{ access_token: string; refresh_token: string }>('/auth/2fa/verify', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, temp_token: tempToken }),
+    }),
+  disable2fa: () => request('/auth/2fa/disable', { method: 'POST' }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+  refreshToken: (refreshToken: string) =>
+    request<{ access_token: string; refresh_token: string }>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
     }),
   listProjects: () => request<import('./types').Project[]>('/projects'),
   getProject: (id: string) => request<import('./types').Project>(`/projects/${id}`),
@@ -87,8 +107,22 @@ export const api = {
   listProjectFindings: (projectId: string) =>
     request<import('./types').Finding[]>(`/projects/${projectId}/findings`),
   getFinding: (id: string) => request<import('./types').Finding>(`/findings/${id}`),
+  createFinding: (data: Partial<import('./types').Finding> & { program_id: string; title: string }) =>
+    request<import('./types').Finding>('/findings', { method: 'POST', body: JSON.stringify(data) }),
+  updateFinding: (id: string, data: Partial<import('./types').Finding>) =>
+    request<import('./types').Finding>(`/findings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFinding: (id: string) => request(`/findings/${id}`, { method: 'DELETE' }),
   claimFinding: (id: string) => request<import('./types').Finding>(`/findings/${id}/claim`, { method: 'POST' }),
   validateFinding: (id: string) => request<import('./types').Finding>(`/findings/${id}/validate`, { method: 'POST' }),
+  reportFinding: (id: string) => request<import('./types').Finding>(`/findings/${id}/report`, { method: 'POST' }),
+  triageFinding: (id: string) => request<{ status: string; finding_id: string; message: string }>(`/findings/${id}/triage`, { method: 'POST' }),
+  getFindingTriage: (id: string) => request<{ finding_id: string; triage: any; confidence: number; triaged_at: string }>(`/findings/${id}/triage`),
+  moveFindingKanban: (id: string, column: string) =>
+    request<import('./types').Finding>(`/findings/${id}/kanban`, { method: 'PUT', body: JSON.stringify({ column }) }),
+
+  // Ports
+  listPorts: (subdomainId: string) => request<import('./types').Port[]>(`/subdomains/${subdomainId}/ports`),
+
   listJobs: (params?: { program_id?: string; status?: string }) => {
     const sp = new URLSearchParams()
     if (params?.program_id) sp.set('program_id', params.program_id)
@@ -106,7 +140,22 @@ export const api = {
   cancelJob: (id: string) => request<import('./types').ScanJob>(`/jobs/${id}`, { method: 'DELETE' }),
   getJobLogs: (id: string) => request<import('./types').JobLogs>(`/jobs/${id}/logs`),
   getJobArtifacts: (id: string) => request<import('./types').JobArtifacts>(`/jobs/${id}/artifacts`),
+  getProgramReport: (programId: string) =>
+    request<{
+      program_id: string
+      program_name: string
+      platform: string
+      findings_count: number
+      counts: { critical: number; high: number; medium: number; low: number; info: number }
+      markdown: string
+      generated_at: string
+    }>(`/programs/${programId}/report`),
   listHunters: () => request<import('./types').Hunter[]>('/hunters'),
+  createHunter: (data: { username: string; display_name: string; role?: string; email?: string; password?: string }) =>
+    request<import('./types').Hunter>('/hunters', { method: 'POST', body: JSON.stringify(data) }),
+  updateHunter: (id: string, data: Partial<import('./types').Hunter>) =>
+    request<import('./types').Hunter>(`/hunters/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteHunter: (id: string) => request(`/hunters/${id}`, { method: 'DELETE' }),
   listTokens: () =>
     request<{ id: string; name: string; created_at: string; last_used: string | null; expires_at: string | null }[]>(
       '/tokens'

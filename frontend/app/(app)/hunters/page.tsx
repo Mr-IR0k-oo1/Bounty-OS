@@ -1,34 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { 
-  Shield, Plus, CheckCircle2, XCircle, MoreHorizontal, 
-  UserCheck, UserX, Edit3, Trash2, X, KeyRound
+  Shield, Plus, CheckCircle2, XCircle, 
+  Edit3, Trash2, X, RefreshCw
 } from "lucide-react"
 import { useToast } from "@/hooks/useToast"
 import { cn } from "@/lib/utils"
-
-type Hunter = {
-  id: string
-  username: string
-  displayName: string
-  role: "admin" | "hunter" | "viewer"
-  twoFactor: boolean
-  lastLogin: string
-  active: boolean
-}
-
-const initialHunters: Hunter[] = [
-  { id: "h1", username: "admin", displayName: "Admin User", role: "admin", twoFactor: true, lastLogin: "Just now", active: true },
-  { id: "h2", username: "hunter1", displayName: "Alice Smith", role: "hunter", twoFactor: true, lastLogin: "15m ago", active: true },
-  { id: "h3", username: "hunter2", displayName: "Bob Jones", role: "hunter", twoFactor: false, lastLogin: "1h ago", active: true },
-  { id: "h4", username: "hunter3", displayName: "Carol White", role: "hunter", twoFactor: true, lastLogin: "1d ago", active: true },
-  { id: "h5", username: "viewer1", displayName: "Dave Brown", role: "viewer", twoFactor: false, lastLogin: "3d ago", active: false },
-]
+import { api } from "@/lib/api"
+import type { Hunter } from "@/lib/types"
 
 const roleColors: Record<string, string> = {
   admin: "bg-critical-muted text-critical border border-critical/20",
@@ -38,69 +22,110 @@ const roleColors: Record<string, string> = {
 
 export default function HuntersPage() {
   const { toast } = useToast()
-  const [hunters, setHunters] = useState<Hunter[]>(initialHunters)
+  const [hunters, setHunters] = useState<Hunter[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editingHunter, setEditingHunter] = useState<Hunter | null>(null)
 
   // Add Hunter Form
   const [addUsername, setAddUsername] = useState("")
   const [addDisplayName, setAddDisplayName] = useState("")
-  const [addRole, setAddRole] = useState<"admin" | "hunter" | "viewer">("hunter")
+  const [addEmail, setAddEmail] = useState("")
+  const [addRole, setAddRole] = useState<"admin" | "hunter">("hunter")
+  const [addPassword, setAddPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function toggleActive(id: string) {
-    setHunters((prev) =>
-      prev.map((h) => {
-        if (h.id === id) {
-          const updatedActive = !h.active
-          toast({
-            title: updatedActive ? "Hunter Activated" : "Hunter Deactivated",
-            description: `${h.displayName} (${h.username}) is now ${updatedActive ? "active" : "inactive"}.`
-          })
-          return { ...h, active: updatedActive }
-        }
-        return h
-      })
-    )
-  }
-
-  function handleCreateHunter(e: React.FormEvent) {
-    e.preventDefault()
-    if (!addUsername.trim() || !addDisplayName.trim()) return
-
-    const newHunter: Hunter = {
-      id: `h-${Date.now()}`,
-      username: addUsername.trim().toLowerCase(),
-      displayName: addDisplayName.trim(),
-      role: addRole,
-      twoFactor: false,
-      lastLogin: "Never",
-      active: true
+  const loadHunters = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.listHunters()
+      setHunters(data || [])
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to load hunters", description: e.message })
+    } finally {
+      setLoading(false)
     }
+  }, [toast])
 
-    setHunters((prev) => [newHunter, ...prev])
-    setAddUsername("")
-    setAddDisplayName("")
-    setShowAdd(false)
-    toast({
-      title: "Hunter Created",
-      description: `${newHunter.displayName} added with role ${newHunter.role}. Invitation link generated.`
-    })
+  useEffect(() => {
+    loadHunters()
+  }, [loadHunters])
+
+  async function toggleActive(hunter: Hunter) {
+    const updatedActive = !hunter.active
+    try {
+      await api.updateHunter(hunter.id, { active: updatedActive })
+      setHunters((prev) =>
+        prev.map((h) => (h.id === hunter.id ? { ...h, active: updatedActive } : h))
+      )
+      toast({
+        title: updatedActive ? "Hunter Activated" : "Hunter Deactivated",
+        description: `${hunter.displayName} (${hunter.username}) is now ${updatedActive ? "active" : "inactive"}.`
+      })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Status update failed", description: e.message })
+    }
   }
 
-  function handleSaveEdit(e: React.FormEvent) {
+  async function handleCreateHunter(e: React.FormEvent) {
+    e.preventDefault()
+    if (!addUsername.trim() || !addDisplayName.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      const created = await api.createHunter({
+        username: addUsername.trim().toLowerCase(),
+        display_name: addDisplayName.trim(),
+        email: addEmail.trim() || undefined,
+        role: addRole,
+        password: addPassword.trim() || "hunter123",
+      })
+
+      setHunters((prev) => [...prev, created])
+      setAddUsername("")
+      setAddDisplayName("")
+      setAddEmail("")
+      setAddPassword("")
+      setShowAdd(false)
+      toast({
+        title: "Hunter Created",
+        description: `${created.displayName} has been added successfully.`
+      })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to create hunter", description: e.message })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingHunter) return
 
-    setHunters((prev) => prev.map((h) => (h.id === editingHunter.id ? editingHunter : h)))
-    toast({ title: "Hunter Updated", description: `Saved details for ${editingHunter.displayName}.` })
-    setEditingHunter(null)
+    try {
+      const updated = await api.updateHunter(editingHunter.id, {
+        displayName: editingHunter.displayName,
+        role: editingHunter.role,
+        active: editingHunter.active,
+      })
+      setHunters((prev) => prev.map((h) => (h.id === updated.id ? updated : h)))
+      toast({ title: "Hunter Updated", description: `Saved details for ${updated.displayName}.` })
+      setEditingHunter(null)
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update failed", description: e.message })
+    }
   }
 
-  function handleDeleteHunter(id: string) {
+  async function handleDeleteHunter(id: string) {
     const target = hunters.find((h) => h.id === id)
     if (!target) return
-    setHunters((prev) => prev.filter((h) => h.id !== id))
-    toast({ title: "Hunter Removed", description: `${target.displayName} was removed from the system.` })
+    try {
+      await api.deleteHunter(id)
+      setHunters((prev) => prev.filter((h) => h.id !== id))
+      toast({ title: "Hunter Removed", description: `${target.displayName} was removed.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Delete failed", description: e.message })
+    }
   }
 
   return (
@@ -116,13 +141,24 @@ export default function HuntersPage() {
           <p className="text-xs text-text-muted mt-1">Manage operators, permissions, and multi-factor authentication.</p>
         </div>
 
-        <Button
-          onClick={() => setShowAdd(true)}
-          className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 shadow-glow-primary self-start sm:self-auto"
-          size="sm"
-        >
-          <Plus className="w-3.5 h-3.5" /> Add New Hunter
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadHunters()}
+            disabled={loading}
+            className="text-xs gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} /> Refresh
+          </Button>
+          <Button
+            onClick={() => setShowAdd(true)}
+            className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 shadow-glow-primary self-start sm:self-auto"
+            size="sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add New Hunter
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-bg-elevated border border-border overflow-hidden shadow-sm">
@@ -146,12 +182,12 @@ export default function HuntersPage() {
                 </td>
                 <td className="px-4 py-3.5 text-xs text-text-secondary">{h.displayName}</td>
                 <td className="px-4 py-3.5">
-                  <span className={`badge text-[10px] font-bold uppercase tracking-wider ${roleColors[h.role]}`}>
+                  <span className={`badge text-[10px] font-bold uppercase tracking-wider ${roleColors[h.role] || "bg-bg-subtle text-text-muted"}`}>
                     {h.role}
                   </span>
                 </td>
                 <td className="px-4 py-3.5">
-                  {h.twoFactor ? (
+                  {h.totpEnabled ? (
                     <span className="inline-flex items-center gap-1.5 text-xs text-low font-medium">
                       <CheckCircle2 className="w-4 h-4 text-low" /> Enforced
                     </span>
@@ -161,7 +197,9 @@ export default function HuntersPage() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-xs text-text-muted">{h.lastLogin}</td>
+                <td className="px-4 py-3.5 text-xs text-text-muted">
+                  {h.lastLogin ? new Date(h.lastLogin).toLocaleDateString() : "Just now"}
+                </td>
                 <td className="px-4 py-3.5">
                   <span className={cn(
                     "badge text-[10px] font-semibold flex items-center gap-1.5 w-fit",
@@ -176,7 +214,7 @@ export default function HuntersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => toggleActive(h.id)}
+                      onClick={() => toggleActive(h)}
                       className="text-xs border-border bg-bg-subtle hover:bg-bg-overlay h-7 px-2"
                     >
                       {h.active ? "Deactivate" : "Activate"}
@@ -203,6 +241,13 @@ export default function HuntersPage() {
                 </td>
               </tr>
             ))}
+            {!loading && hunters.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-xs text-text-muted">
+                  No hunters found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
@@ -222,23 +267,42 @@ export default function HuntersPage() {
             </div>
             <form onSubmit={handleCreateHunter} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-text-secondary">Username</Label>
+                <Label className="text-xs text-text-secondary">Username *</Label>
                 <Input
                   value={addUsername}
                   onChange={(e) => setAddUsername(e.target.value)}
-                  placeholder="e.g. jdoe"
+                  placeholder="e.g. hunter2"
                   className="bg-bg-subtle border-border text-xs"
                   required
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-text-secondary">Full Display Name</Label>
+                <Label className="text-xs text-text-secondary">Full Display Name *</Label>
                 <Input
                   value={addDisplayName}
                   onChange={(e) => setAddDisplayName(e.target.value)}
-                  placeholder="e.g. John Doe"
+                  placeholder="e.g. Alice Smith"
                   className="bg-bg-subtle border-border text-xs"
                   required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-secondary">Email Address (Optional)</Label>
+                <Input
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="hunter@bountyos.local"
+                  className="bg-bg-subtle border-border text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-secondary">Password (Optional - defaults to hunter123)</Label>
+                <Input
+                  type="password"
+                  value={addPassword}
+                  onChange={(e) => setAddPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="bg-bg-subtle border-border text-xs"
                 />
               </div>
               <div className="space-y-1.5">
@@ -248,20 +312,16 @@ export default function HuntersPage() {
                   onChange={(e) => setAddRole(e.target.value as any)}
                   className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-text-primary"
                 >
-                  <option value="hunter">Hunter (Scan, triage findings, write reports)</option>
-                  <option value="viewer">Viewer (Read-only findings & recon)</option>
-                  <option value="admin">Admin (Full system access & settings)</option>
+                  <option value="hunter">Hunter (Full Scan & Scope Operator)</option>
+                  <option value="admin">Administrator (System & Program Management)</option>
                 </select>
               </div>
-              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-text-secondary">
-                A temporary credential will be created. The hunter will be required to set up TOTP two-factor authentication upon first login.
-              </div>
-              <div className="flex gap-2 justify-end pt-3 border-t border-border">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdd(false)} className="text-xs">
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdd(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
-                  Create Hunter
+                <Button type="submit" disabled={isSubmitting} size="sm" className="btn-primary">
+                  {isSubmitting ? "Adding..." : "Add Hunter"}
                 </Button>
               </div>
             </form>
@@ -274,10 +334,7 @@ export default function HuntersPage() {
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <Card className="w-full max-w-md bg-bg-elevated border border-border shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-primary" />
-                <h3 className="text-base font-semibold text-text-primary">Edit Member</h3>
-              </div>
+              <h3 className="text-base font-semibold text-text-primary">Edit Hunter: {editingHunter.username}</h3>
               <button onClick={() => setEditingHunter(null)} className="p-1 rounded-lg text-text-muted hover:text-text-primary">
                 <X className="w-4 h-4" />
               </button>
@@ -300,27 +357,14 @@ export default function HuntersPage() {
                   className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-text-primary"
                 >
                   <option value="hunter">Hunter</option>
-                  <option value="viewer">Viewer</option>
-                  <option value="admin">Admin</option>
+                  <option value="admin">Administrator</option>
                 </select>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-xl bg-bg-subtle border border-border">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-text-primary">Enforce Two-Factor Auth</div>
-                  <div className="text-[11px] text-text-muted">Require TOTP authenticator app</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={editingHunter.twoFactor}
-                  onChange={(e) => setEditingHunter({ ...editingHunter, twoFactor: e.target.checked })}
-                  className="rounded border-border text-primary"
-                />
-              </div>
-              <div className="flex gap-2 justify-end pt-3 border-t border-border">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setEditingHunter(null)} className="text-xs">
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditingHunter(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
+                <Button type="submit" size="sm" className="btn-primary">
                   Save Changes
                 </Button>
               </div>
@@ -331,4 +375,3 @@ export default function HuntersPage() {
     </div>
   )
 }
-

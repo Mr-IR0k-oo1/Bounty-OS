@@ -38,3 +38,12 @@ generate-certs:
 setup:
 	cp .env.example .env
 	echo "Please edit .env with your configuration"
+
+mcp-build:
+	cd mcp && npm run build
+
+mcp-test:
+	cd mcp && npm run test
+
+mcp-start:
+	cd mcp && node dist/index.js

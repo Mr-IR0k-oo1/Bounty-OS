@@ -207,15 +207,29 @@ pub async fn create_job(
         ));
     }
 
+    // Defense-in-depth: Reject shell metacharacters and injection primitives across all tools
+    let forbidden_chars = [';', '|', '&', '`', '$', '\n', '\r', '\0', '<', '>'];
+    if target.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "Target contains forbidden characters (command injection blocked)"
+            })),
+        ));
+    }
+
     // 1. Strict tool whitelisting (never execute arbitrary paths or shell commands)
     let allowed_tools = [
         "subfinder",
+        "dnsx",
         "httpx",
         "naabu",
         "katana",
         "nuclei",
         "gau",
         "waybackurls",
+        "ffuf",
+        "dalfox",
     ];
     if !allowed_tools.contains(&tool.as_str()) {
         return Err((
@@ -332,16 +346,8 @@ pub async fn create_job(
         }
     }
 
-    // 5. Check concurrency limits
-    let running_count = {
-        let lock = state.in_memory_jobs().read().await;
-        lock.iter().filter(|j| j.status == "running").count()
-    };
-    let initial_status = if running_count >= state.config().max_concurrent_jobs {
-        "queued".to_string()
-    } else {
-        "running".to_string()
-    };
+    // 5. Initial job status (always spawned as an active asynchronous managed task)
+    let initial_status = "running".to_string();
 
     let job_id = Uuid::new_v4();
     let stage = ScanStage::try_from(stage_num).unwrap_or(ScanStage::Passive);
@@ -451,27 +457,19 @@ pub async fn create_job(
             });
         } else {
             let state_clone = state.clone();
+            let target_clone = target.clone();
+            let tool_clone = tool.clone();
+            let flags_clone = payload.flags.clone();
             tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
-                let finished_at = chrono::Utc::now();
-                if state_clone.has_db() {
-                    let _ = sqlx::query(
-                        "UPDATE scan_jobs SET status = 'done', completed_at = $1, updated_at = $1 WHERE id = $2"
-                    )
-                    .bind(finished_at)
-                    .bind(job_id)
-                    .execute(state_clone.db())
-                    .await;
-                }
-                let mut lock = state_clone.in_memory_jobs().write().await;
-                if let Some(j) = lock.iter_mut().find(|j| j.id == job_id) {
-                    j.status = "done".to_string();
-                    j.completed_at = Some(finished_at);
-                    j.updated_at = finished_at;
-                }
-                let _ = state_clone
-                    .ws_tx()
-                    .send(format!("[job:{}] Scan job completed successfully.", job_id));
+                crate::pipeline::runner::run_managed_tool_job(
+                    job_id,
+                    program.id,
+                    tool_clone,
+                    target_clone,
+                    flags_clone,
+                    state_clone,
+                )
+                .await;
             });
         }
     }

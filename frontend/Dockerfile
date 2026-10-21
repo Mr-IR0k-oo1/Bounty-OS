@@ -22,6 +22,7 @@ RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
+RUN apk add --no-cache curl
 
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -35,4 +36,8 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://127.0.0.1:3000/login || exit 1
+
 CMD ["npm", "run", "start"]

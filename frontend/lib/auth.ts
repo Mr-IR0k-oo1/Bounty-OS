@@ -21,11 +21,29 @@ export function setTokens(access: string, refresh?: string): void {
   }
 }
 
+const TEMP_TOKEN_KEY = 'bountyos_2fa_temp'
+
+export function setTempToken(tempToken: string): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(TEMP_TOKEN_KEY, tempToken)
+}
+
+export function getTempToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return sessionStorage.getItem(TEMP_TOKEN_KEY)
+}
+
+export function clearTempToken(): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(TEMP_TOKEN_KEY)
+}
+
 export function clearTokens(): void {
   if (typeof window === 'undefined') return
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(REFRESH_KEY)
   localStorage.removeItem(LEGACY_TOKEN_KEY)
+  clearTempToken()
 }
 
 export function isAuthenticated(): boolean {

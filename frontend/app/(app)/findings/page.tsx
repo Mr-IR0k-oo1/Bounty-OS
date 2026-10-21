@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { 
   Search, Download, UserCheck, AlertTriangle, ChevronDown, 
-  Filter, X, Plus, CheckCircle, Shield, ExternalLink
+  Filter, X, Plus, CheckCircle, Shield, ExternalLink, RefreshCw, Trash2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/useToast"
-import type { Severity, FindingStatus } from "@/lib/types"
+import { api } from "@/lib/api"
+import type { Severity, FindingStatus, Finding, Program } from "@/lib/types"
 
 interface DisplayFinding {
   id: string
@@ -22,21 +23,12 @@ interface DisplayFinding {
   host: string
   status: FindingStatus
   program: string
+  programId: string
   hunter: string
   date: string
   tool: string
+  description?: string | null
 }
-
-const initialFindings: DisplayFinding[] = [
-  { id: "1", severity: "critical", title: "SSRF in api.uber.com/endpoint", host: "api.uber.com", status: "new", program: "Uber — H1", hunter: "—", date: "2m ago", tool: "nuclei" },
-  { id: "2", severity: "high", title: "SQL Injection in checkout.php", host: "shop.example.com", status: "triaged", program: "Shopify — Intigriti", hunter: "alice", date: "1h ago", tool: "nuclei" },
-  { id: "3", severity: "medium", title: "Reflected XSS in search endpoint", host: "twitter.com", status: "new", program: "Twitter — H1", hunter: "—", date: "3h ago", tool: "nuclei" },
-  { id: "4", severity: "high", title: "IDOR in user profile API", host: "api.grab.com", status: "validated", program: "Grab — Bugcrowd", hunter: "bob", date: "6h ago", tool: "katana" },
-  { id: "5", severity: "low", title: "CORS misconfiguration", host: "cdn.example.com", status: "new", program: "Acme Corp", hunter: "—", date: "12h ago", tool: "httpx" },
-  { id: "6", severity: "critical", title: "RCE in file upload handler", host: "files.example.com", status: "submitted", program: "Uber — H1", hunter: "alice", date: "1d ago", tool: "nuclei" },
-  { id: "7", severity: "medium", title: "Open redirect in /auth/callback", host: "auth.uber.com", status: "fp", program: "Uber — H1", hunter: "bob", date: "2d ago", tool: "ffuf" },
-  { id: "8", severity: "info", title: "Missing security headers", host: "blog.example.com", status: "new", program: "Shopify — Intigriti", hunter: "—", date: "2d ago", tool: "httpx" },
-]
 
 const severityColors: Record<Severity, string> = {
   critical: "bg-critical",
@@ -76,20 +68,73 @@ const statusColors: Record<FindingStatus, string> = {
 export default function FindingsPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [findingsList, setFindingsList] = useState<DisplayFinding[]>(initialFindings)
+  const [findingsList, setFindingsList] = useState<DisplayFinding[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [search, setSearch] = useState("")
   const [selectedSeverities, setSelectedSeverities] = useState<Severity[]>([])
   const [selectedStatuses, setSelectedStatuses] = useState<FindingStatus[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [newModalOpen, setNewModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // New Finding Form
   const [newTitle, setNewTitle] = useState("")
   const [newHost, setNewHost] = useState("")
-  const [newProgram, setNewProgram] = useState("Uber — H1")
+  const [newProgramId, setNewProgramId] = useState("")
   const [newSeverity, setNewSeverity] = useState<Severity>("high")
   const [newTool, setNewTool] = useState("manual")
   const [newDescription, setNewDescription] = useState("")
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [rawFindings, progList] = await Promise.all([
+        api.listFindings().catch(() => []),
+        api.listPrograms().catch(() => []),
+      ])
+
+      setPrograms(progList || [])
+      if (progList && progList.length > 0 && !newProgramId) {
+        setNewProgramId(progList[0].id)
+      }
+
+      const progMap = new Map<string, string>()
+      progList?.forEach((p) => progMap.set(p.id, p.name))
+
+      const formatted: DisplayFinding[] = (rawFindings || []).map((f: any) => {
+        const pId = f.program_id || f.programId || ""
+        const pName = progMap.get(pId) || f.program?.name || "Program"
+        const dt = f.created_at || f.foundAt
+        return {
+          id: String(f.id),
+          severity: (f.severity || "info").toLowerCase() as Severity,
+          title: f.title || "Untitled Finding",
+          host: f.matched_at || (f as any).host || "Target Host",
+          status: (f.status || "new").toLowerCase() as FindingStatus,
+          program: pName,
+          programId: pId,
+          hunter: f.assigned_to ? "Assigned" : "—",
+          date: dt ? new Date(dt).toLocaleDateString([], { month: "short", day: "numeric" }) : "Recently",
+          tool: f.tool || f.finding_type || "manual",
+          description: f.description,
+        }
+      })
+
+      setFindingsList(formatted)
+    } catch (e: any) {
+      setError(e.message || "Failed to load findings")
+    } finally {
+      setLoading(false)
+    }
+  }, [newProgramId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const toggleSeverity = (s: Severity) => {
     setSelectedSeverities(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
@@ -111,34 +156,61 @@ export default function FindingsPage() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
-  const handleAssignToMe = () => {
+  const handleAssignToMe = async () => {
     if (selectedIds.length === 0) {
       toast({ title: "No findings selected", description: "Select one or more findings to assign." })
       return
     }
-    setFindingsList(prev => prev.map(f => selectedIds.includes(f.id) ? { ...f, hunter: "admin" } : f))
-    toast({ title: "Findings assigned", description: `Assigned ${selectedIds.length} finding(s) to you.` })
-    setSelectedIds([])
+    try {
+      await Promise.all(selectedIds.map(id => api.claimFinding(id).catch(() => null)))
+      toast({ title: "Findings Assigned", description: `Assigned ${selectedIds.length} finding(s) to you.` })
+      setSelectedIds([])
+      loadData()
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Assignment failed", description: e.message })
+    }
   }
 
-  const handleMarkFp = () => {
+  const handleMarkFp = async () => {
     if (selectedIds.length === 0) {
       toast({ title: "No findings selected", description: "Select one or more findings to mark as false positive." })
       return
     }
-    setFindingsList(prev => prev.map(f => selectedIds.includes(f.id) ? { ...f, status: "fp" } : f))
-    toast({ title: "Updated to False Positive", description: `Marked ${selectedIds.length} finding(s) as FP.` })
-    setSelectedIds([])
+    try {
+      await Promise.all(selectedIds.map(id => api.updateFinding(id, { status: "fp" }).catch(() => null)))
+      toast({ title: "Marked False Positive", description: `Updated ${selectedIds.length} finding(s).` })
+      setSelectedIds([])
+      loadData()
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update failed", description: e.message })
+    }
   }
 
-  const handleMarkValidated = () => {
+  const handleMarkValidated = async () => {
     if (selectedIds.length === 0) {
       toast({ title: "No findings selected", description: "Select one or more findings to validate." })
       return
     }
-    setFindingsList(prev => prev.map(f => selectedIds.includes(f.id) ? { ...f, status: "validated" } : f))
-    toast({ title: "Findings Validated", description: `Marked ${selectedIds.length} finding(s) as validated.` })
-    setSelectedIds([])
+    try {
+      await Promise.all(selectedIds.map(id => api.validateFinding(id).catch(() => null)))
+      toast({ title: "Findings Validated", description: `Validated ${selectedIds.length} finding(s).` })
+      setSelectedIds([])
+      loadData()
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Validation failed", description: e.message })
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    try {
+      await Promise.all(selectedIds.map(id => api.deleteFinding(id).catch(() => null)))
+      toast({ title: "Findings Deleted", description: `Deleted ${selectedIds.length} finding(s).` })
+      setSelectedIds([])
+      loadData()
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Delete failed", description: e.message })
+    }
   }
 
   const handleExportCsv = () => {
@@ -148,149 +220,172 @@ export default function FindingsPage() {
 
     const csvRows = [
       ["ID", "Severity", "Title", "Host", "Status", "Program", "Hunter", "Date", "Tool"],
-      ...toExport.map(f => [f.id, f.severity, `"${f.title.replace(/"/g, '""')}"`, f.host, f.status, `"${f.program}"`, f.hunter, f.date, f.tool])
+      ...toExport.map(f => [f.id, f.severity, `"${f.title.replace(/"/g, '""')}"`, f.host, f.status, f.program, f.hunter, f.date, f.tool])
     ]
     const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n")
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `bountyos_findings_${Date.now()}.csv`)
+    link.setAttribute("download", `bountyos-findings-${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    toast({ title: "Export complete", description: `Exported ${toExport.length} finding(s) to CSV.` })
+    toast({ title: "Export complete", description: `Exported ${toExport.length} findings to CSV.` })
   }
 
-  const handleCreateFinding = (e: React.FormEvent) => {
+  const handleCreateFinding = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newTitle.trim() || !newHost.trim()) return
+    if (!newTitle.trim()) return
 
-    const created: DisplayFinding = {
-      id: String(Date.now()),
-      severity: newSeverity,
-      title: newTitle.trim(),
-      host: newHost.trim(),
-      status: "new",
-      program: newProgram,
-      hunter: "admin",
-      date: "Just now",
-      tool: newTool
+    const targetProgId = newProgramId || (programs[0] ? programs[0].id : "")
+    if (!targetProgId) {
+      toast({ variant: "destructive", title: "No Program Available", description: "Please create a program first." })
+      return
     }
 
-    setFindingsList(prev => [created, ...prev])
-    setNewTitle("")
-    setNewHost("")
-    setNewDescription("")
-    setNewModalOpen(false)
-    toast({ title: "Finding logged", description: `Successfully created "${created.title}".` })
+    setIsSubmitting(true)
+    try {
+      await api.createFinding({
+        program_id: targetProgId,
+        title: newTitle.trim(),
+        matched_at: newHost.trim() || undefined,
+        severity: newSeverity,
+        finding_type: newTool,
+        description: newDescription.trim() || undefined,
+        status: "new",
+      })
+
+      setNewModalOpen(false)
+      setNewTitle("")
+      setNewHost("")
+      setNewDescription("")
+      toast({ title: "Finding Recorded", description: "Vulnerability saved to program records." })
+      loadData()
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Creation Failed", description: err.message || "Could not save finding" })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const filtered = findingsList.filter(f => {
-    if (search && !f.title.toLowerCase().includes(search.toLowerCase()) && !f.host.includes(search)) return false
-    if (selectedSeverities.length && !selectedSeverities.includes(f.severity)) return false
-    if (selectedStatuses.length && !selectedStatuses.includes(f.status)) return false
-    return true
-  })
+  const filtered = useMemo(() => {
+    return findingsList
+      .filter(f => !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.host.toLowerCase().includes(search.toLowerCase()))
+      .filter(f => selectedSeverities.length === 0 || selectedSeverities.includes(f.severity))
+      .filter(f => selectedStatuses.length === 0 || selectedStatuses.includes(f.status))
+  }, [findingsList, search, selectedSeverities, selectedStatuses])
 
-  const severityList: Severity[] = ["critical", "high", "medium", "low", "info"]
-  const statusList: FindingStatus[] = ["new", "triaged", "validated", "submitted", "fp", "dup"]
+  const stats = {
+    critical: findingsList.filter(f => f.severity === "critical").length,
+    high: findingsList.filter(f => f.severity === "high").length,
+    medium: findingsList.filter(f => f.severity === "medium").length,
+    low: findingsList.filter(f => f.severity === "low").length,
+    info: findingsList.filter(f => f.severity === "info").length,
+  }
 
   return (
-    <div className="flex gap-6 h-full">
-      {/* Sidebar Filters */}
-      <aside className="w-[230px] shrink-0 space-y-5">
-        <div>
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Filter className="w-3 h-3" /> Filters
-          </h2>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Search findings or host..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-base w-full pl-8 text-xs bg-bg-elevated border-border"
-            />
-          </div>
+    <div className="flex gap-6">
+      {/* Left Sidebar — Severity Filters */}
+      <aside className="w-56 shrink-0 space-y-4">
+        <div className="bg-bg-elevated border border-border rounded-xl p-3.5 space-y-2">
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Severity</h3>
+          {(["critical", "high", "medium", "low", "info"] as Severity[]).map((s) => {
+            const isSelected = selectedSeverities.includes(s)
+            return (
+              <button
+                key={s}
+                onClick={() => toggleSeverity(s)}
+                className={cn(
+                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                  isSelected ? severityBgColors[s] : "hover:bg-bg-overlay text-text-secondary"
+                )}
+              >
+                <div className="flex items-center gap-2 capitalize">
+                  <div className={`w-2 h-2 rounded-full ${severityColors[s]}`} />
+                  {s}
+                </div>
+                <span className="font-mono text-text-muted text-[11px]">{stats[s]}</span>
+              </button>
+            )
+          })}
         </div>
 
-        <div>
-          <h3 className="text-xs font-medium text-text-secondary mb-2">Severity</h3>
-          <div className="space-y-1">
-            {severityList.map((s) => (
-              <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-overlay cursor-pointer transition-fast">
-                <input
-                  type="checkbox"
-                  checked={selectedSeverities.includes(s)}
-                  onChange={() => toggleSeverity(s)}
-                  className="rounded border-border bg-bg-overlay text-primary focus:ring-primary/30 focus:ring-offset-0 w-3.5 h-3.5"
-                />
-                <div className={`w-2 h-2 rounded-full ${severityColors[s]}`} />
-                <span className="text-xs text-text-secondary capitalize">{s}</span>
-              </label>
-            ))}
-          </div>
+        {/* Status Filter */}
+        <div className="bg-bg-elevated border border-border rounded-xl p-3.5 space-y-2">
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Status</h3>
+          {(["new", "triaged", "validated", "submitted", "fp"] as FindingStatus[]).map((st) => {
+            const isSelected = selectedStatuses.includes(st)
+            const count = findingsList.filter(f => f.status === st).length
+            return (
+              <button
+                key={st}
+                onClick={() => toggleStatus(st)}
+                className={cn(
+                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize",
+                  isSelected ? "bg-bg-subtle text-text-primary border border-border" : "hover:bg-bg-overlay text-text-secondary"
+                )}
+              >
+                <span>{st.replace("_", " ")}</span>
+                <span className="font-mono text-text-muted text-[11px]">{count}</span>
+              </button>
+            )
+          })}
         </div>
-
-        <div>
-          <h3 className="text-xs font-medium text-text-secondary mb-2">Status</h3>
-          <div className="space-y-1">
-            {statusList.map((s) => (
-              <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-overlay cursor-pointer transition-fast">
-                <input
-                  type="checkbox"
-                  checked={selectedStatuses.includes(s)}
-                  onChange={() => toggleStatus(s)}
-                  className="rounded border-border bg-bg-overlay text-primary focus:ring-primary/30 focus:ring-offset-0 w-3.5 h-3.5"
-                />
-                <span className="text-xs text-text-secondary capitalize">{s.replace("_", " ")}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={() => { setSelectedSeverities([]); setSelectedStatuses([]); setSearch("") }}
-          className="text-xs text-primary hover:underline w-full text-left"
-        >
-          Clear all filters
-        </button>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 space-y-4 min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <main className="flex-1 min-w-0 space-y-4">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
               Vulnerability Findings
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary-muted text-primary">
-                {filtered.length} total
+                {findingsList.length}
               </span>
             </h1>
-            <p className="text-xs text-text-muted mt-0.5">Triaged and aggregated security issues across active scopes.</p>
+            <p className="text-xs text-text-muted mt-1">Real-time vulnerability pipeline across all enrolled target programs.</p>
           </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              onClick={() => setNewModalOpen(true)}
-              className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 shadow-glow-primary"
-              size="sm"
-            >
-              <Plus className="w-3.5 h-3.5" /> Log Finding
-            </Button>
 
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData()}
+              disabled={loading}
+              className="gap-1.5 text-xs text-text-primary"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} /> Refresh
+            </Button>
+            <Button onClick={() => setNewModalOpen(true)} className="btn-primary text-xs gap-1.5">
+              <Plus className="w-4 h-4" /> New Finding
+            </Button>
+          </div>
+        </div>
+
+        {/* Search & Actions Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-bg-elevated border border-border p-3 rounded-xl">
+          <div className="relative flex-1 min-w-[240px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Filter findings by title or host..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-base pl-9 text-xs w-full bg-bg-base border-border"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleAssignToMe}
               disabled={selectedIds.length === 0}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-fast border border-border",
-                selectedIds.length > 0 
-                  ? "bg-bg-elevated text-text-primary hover:bg-bg-overlay cursor-pointer" 
-                  : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
+                selectedIds.length > 0 ? "bg-bg-overlay hover:bg-bg-subtle text-text-primary cursor-pointer" : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
               )}
             >
-              <UserCheck className="w-3.5 h-3.5 text-primary" /> Assign ({selectedIds.length})
+              <UserCheck className="w-3.5 h-3.5 text-primary" /> Assign to Me
             </button>
 
             <button
@@ -298,9 +393,7 @@ export default function FindingsPage() {
               disabled={selectedIds.length === 0}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-fast border border-low/30",
-                selectedIds.length > 0 
-                  ? "bg-low-muted text-low hover:bg-low/20 cursor-pointer" 
-                  : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
+                selectedIds.length > 0 ? "bg-low-muted text-low hover:bg-low/20 cursor-pointer" : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
               )}
             >
               <CheckCircle className="w-3.5 h-3.5" /> Validate
@@ -311,12 +404,21 @@ export default function FindingsPage() {
               disabled={selectedIds.length === 0}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-fast border border-critical/30",
-                selectedIds.length > 0 
-                  ? "bg-critical-muted text-critical hover:bg-critical/20 cursor-pointer" 
-                  : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
+                selectedIds.length > 0 ? "bg-critical-muted text-critical hover:bg-critical/20 cursor-pointer" : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
               )}
             >
               <AlertTriangle className="w-3.5 h-3.5" /> Mark FP
+            </button>
+
+            <button
+              onClick={handleDeleteSelected}
+              disabled={selectedIds.length === 0}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-fast border border-critical/20",
+                selectedIds.length > 0 ? "bg-critical-muted text-critical hover:bg-critical/30 cursor-pointer" : "bg-bg-subtle text-text-muted cursor-not-allowed opacity-50"
+              )}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
 
             <button
@@ -381,7 +483,7 @@ export default function FindingsPage() {
                 return (
                   <tr
                     key={f.id}
-                    onClick={() => router.push(`/findings/${f.id}`)}
+                    onClick={() => router.push(`/programs/${f.programId}?tab=findings`)}
                     className={cn(
                       "table-row cursor-pointer transition-colors group",
                       isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-bg-overlay/60"
@@ -414,7 +516,7 @@ export default function FindingsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${statusColors[f.status]}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${statusColors[f.status] || "bg-bg-subtle text-text-muted"}`}>
                         {f.status.replace("_", " ")}
                       </span>
                     </td>
@@ -426,11 +528,11 @@ export default function FindingsPage() {
                   </tr>
                 )
               })}
-              {filtered.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-16 text-center text-sm text-text-muted">
                     <AlertTriangle className="w-8 h-8 text-text-muted/40 mx-auto mb-2" />
-                    No findings match your current filters.
+                    No findings found in the database. Run scans or log a finding to populate.
                   </td>
                 </tr>
               )}
@@ -457,45 +559,46 @@ export default function FindingsPage() {
             </div>
             <form onSubmit={handleCreateFinding} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-text-secondary">Vulnerability Title</Label>
+                <Label className="text-xs text-text-secondary">Target Program *</Label>
+                <select
+                  value={newProgramId}
+                  onChange={(e) => setNewProgramId(e.target.value)}
+                  className="input-base text-xs bg-bg-base border-border w-full py-2 px-3 rounded-lg"
+                  required
+                >
+                  {programs.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-secondary">Vulnerability Title *</Label>
                 <Input
+                  required
+                  placeholder="e.g. Broken Access Control in /api/v1/workspaces"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Remote Code Execution via Deserialization"
-                  className="bg-bg-subtle border-border text-xs"
-                  required
+                  className="text-xs bg-bg-base"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-text-secondary">Target Host / URL</Label>
+                  <Label className="text-xs text-text-secondary">Affected Host / URL</Label>
                   <Input
+                    placeholder="e.g. api.example.com"
                     value={newHost}
                     onChange={(e) => setNewHost(e.target.value)}
-                    placeholder="api.target.com"
-                    className="bg-bg-subtle border-border text-xs"
-                    required
+                    className="text-xs bg-bg-base"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-text-secondary">Program</Label>
-                  <Input
-                    value={newProgram}
-                    onChange={(e) => setNewProgram(e.target.value)}
-                    className="bg-bg-subtle border-border text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-text-secondary">Severity</Label>
                   <select
                     value={newSeverity}
                     onChange={(e) => setNewSeverity(e.target.value as Severity)}
-                    className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-text-primary"
+                    className="input-base text-xs bg-bg-base border-border w-full py-2 px-3 rounded-lg capitalize"
                   >
                     <option value="critical">Critical</option>
                     <option value="high">High</option>
@@ -504,43 +607,25 @@ export default function FindingsPage() {
                     <option value="info">Info</option>
                   </select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-text-secondary">Discovery Tool</Label>
-                  <Input
-                    value={newTool}
-                    onChange={(e) => setNewTool(e.target.value)}
-                    placeholder="manual / nuclei / burp"
-                    className="bg-bg-subtle border-border text-xs"
-                  />
-                </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-text-secondary">Description & PoC Details</Label>
+                <Label className="text-xs text-text-secondary">Description & Reproduction Steps</Label>
                 <Textarea
+                  placeholder="Proof of Concept, curl commands, headers, and impact..."
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Detailed reproduction steps and impact..."
-                  className="bg-bg-subtle border-border text-xs min-h-[90px]"
+                  rows={4}
+                  className="text-xs bg-bg-base"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setNewModalOpen(false)}
-                  className="text-xs"
-                >
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setNewModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="bg-primary hover:bg-primary-hover text-white text-xs"
-                >
-                  Save Finding
+                <Button type="submit" disabled={isSubmitting} size="sm" className="btn-primary">
+                  {isSubmitting ? "Saving..." : "Save Finding"}
                 </Button>
               </div>
             </form>
@@ -550,4 +635,3 @@ export default function FindingsPage() {
     </div>
   )
 }
-

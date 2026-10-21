@@ -51,3 +51,4 @@ pub async fn seed_defaults_if_empty(pool: &PgPool) -> Result<(), sqlx::Error> {
 
     Ok(())
 }
+

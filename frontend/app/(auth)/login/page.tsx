@@ -12,7 +12,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { login } = useAuth()
   const [username, setUsername] = useState("admin")
-  const [password, setPassword] = useState("password123")
+  const [password, setPassword] = useState("admin")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -29,8 +29,8 @@ export default function LoginPage() {
         return
       }
       router.push("/dashboard")
-    } catch {
-      setError("Unable to authenticate. Please check your credentials.")
+    } catch (err: any) {
+      setError(err?.message || "Invalid username or password. Please verify your credentials.")
     } finally {
       setLoading(false)
     }

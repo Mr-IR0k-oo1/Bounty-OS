@@ -287,3 +287,50 @@ pub async fn import_scope(
         "imported_count": imported
     })))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CheckScopeQuery {
+    pub target: String,
+}
+
+pub async fn check_scope_endpoint(
+    State(state): State<AppState>,
+    Path(program_id): Path<Uuid>,
+    axum::extract::Query(query): axum::extract::Query<CheckScopeQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let in_scope = if state.has_db() {
+        crate::pipeline::scope_check::is_target_in_scope(&query.target, program_id, state.db())
+            .await
+            .unwrap_or(false)
+    } else {
+        let lock = state.in_memory_scope().read().await;
+        let rules: Vec<_> = lock.iter().filter(|s| s.program_id == program_id).collect();
+        let is_explicit_oos = rules.iter().any(|r| {
+            r.out_of_scope
+                && crate::pipeline::scope_check::matches_scope(
+                    &query.target,
+                    &r.target,
+                    &r.target_type,
+                )
+        });
+        if is_explicit_oos {
+            false
+        } else {
+            rules.iter().any(|r| {
+                !r.out_of_scope
+                    && crate::pipeline::scope_check::matches_scope(
+                        &query.target,
+                        &r.target,
+                        &r.target_type,
+                    )
+            })
+        }
+    };
+
+    Ok(Json(serde_json::json!({
+        "program_id": program_id,
+        "target": query.target,
+        "in_scope": in_scope,
+    })))
+}
+

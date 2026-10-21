@@ -1,27 +1,38 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Shield, Key, Smartphone, LogOut, Copy, CheckCircle2, Eye, EyeOff, Check } from "lucide-react"
 import { useToast } from "@/hooks/useToast"
+import { useAuth } from "@/hooks/useAuth"
+import { api } from "@/lib/api"
 
 const initialSessions = [
-  { id: "s1", device: "Chrome on macOS", ip: "192.168.1.100", lastActive: "Now", current: true },
-  { id: "s2", device: "Firefox on Linux", ip: "10.0.0.50", lastActive: "2h ago", current: false },
-  { id: "s3", device: "Safari on iOS", ip: "203.0.113.42", lastActive: "1d ago", current: false },
+  { id: "s1", device: "Chrome on Windows", ip: "127.0.0.1", lastActive: "Now", current: true },
 ]
 
 export default function SecuritySettingsPage() {
   const { toast } = useToast()
+  const { user, refetchUser } = useAuth()
   const [passwordForm, setPasswordForm] = useState({ current: "", newPass: "", confirm: "" })
+  const [isChangingPass, setIsChangingPass] = useState(false)
   const [show2faSetup, setShow2faSetup] = useState(false)
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.totpEnabled ?? false)
   const [totpCode, setTotpCode] = useState("")
+  const [qrCodeUrl, setQrCodeUrl] = useState("")
+  const [secretKey, setSecretKey] = useState("")
+  const [isStarting2fa, setIsStarting2fa] = useState(false)
   const [showBackupCodes, setShowBackupCodes] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [sessionsList, setSessionsList] = useState(initialSessions)
+
+  useEffect(() => {
+    if (user) {
+      setTwoFactorEnabled(Boolean(user.totpEnabled))
+    }
+  }, [user])
 
   const backupCodes = ["A1B2-C3D4", "E5F6-G7H8", "I9J0-K1L2", "M3N4-O5P6", "Q7R8-S9T0", "U1V2-W3X4"]
 
@@ -32,7 +43,7 @@ export default function SecuritySettingsPage() {
     toast({ title: "Copied", description: `Backup code ${code} copied.` })
   }
 
-  function handleUpdatePassword(e: React.FormEvent) {
+  async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault()
     if (!passwordForm.current) {
       toast({ variant: "destructive", title: "Missing field", description: "Please enter your current password." })
@@ -47,24 +58,64 @@ export default function SecuritySettingsPage() {
       return
     }
 
-    setPasswordForm({ current: "", newPass: "", confirm: "" })
-    toast({ title: "Password Changed", description: "Your account password has been updated securely." })
+    setIsChangingPass(true)
+    try {
+      await api.changePassword(passwordForm.current, passwordForm.newPass)
+      setPasswordForm({ current: "", newPass: "", confirm: "" })
+      toast({ title: "Password Changed", description: "Your account password has been updated securely." })
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: err?.message || "Failed to update password." })
+    } finally {
+      setIsChangingPass(false)
+    }
   }
 
-  function handleVerifyTotp() {
+  async function handleStart2faSetup() {
+    setIsStarting2fa(true)
+    try {
+      // Use current password if entered or prompt
+      const pwd = passwordForm.current || prompt("Enter current account password to initiate 2FA setup:") || ""
+      if (!pwd) {
+        setIsStarting2fa(false)
+        return
+      }
+      const data = await api.setup2fa(pwd)
+      setSecretKey(data.secret)
+      setQrCodeUrl(data.qr_code_url)
+      setShow2faSetup(true)
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "2FA Setup Failed", description: err?.message || "Authentication failed." })
+    } finally {
+      setIsStarting2fa(false)
+    }
+  }
+
+  async function handleVerifyTotp() {
     if (totpCode.length !== 6) {
       toast({ variant: "destructive", title: "Invalid Code", description: "Please enter a valid 6-digit TOTP code." })
       return
     }
-    setTwoFactorEnabled(true)
-    setShow2faSetup(false)
-    setTotpCode("")
-    toast({ title: "2FA Configured", description: "Two-factor authentication is active on your account." })
+    try {
+      await api.verify2fa(totpCode)
+      setTwoFactorEnabled(true)
+      setShow2faSetup(false)
+      setTotpCode("")
+      await refetchUser()
+      toast({ title: "2FA Configured", description: "Two-factor authentication is active on your account." })
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Invalid Code", description: err?.message || "Verification code failed." })
+    }
   }
 
-  function handleDisable2fa() {
-    setTwoFactorEnabled(false)
-    toast({ title: "2FA Disabled", description: "Two-factor authentication has been disabled." })
+  async function handleDisable2fa() {
+    try {
+      await api.disable2fa()
+      setTwoFactorEnabled(false)
+      await refetchUser()
+      toast({ title: "2FA Disabled", description: "Two-factor authentication has been disabled." })
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Failed", description: err?.message || "Could not disable 2FA." })
+    }
   }
 
   function handleRevokeSession(id: string) {
@@ -123,50 +174,21 @@ export default function SecuritySettingsPage() {
         </div>
 
         {twoFactorEnabled && !show2faSetup ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs text-low font-medium">
               <CheckCircle2 className="w-4 h-4" /> Two-factor authentication is currently enabled.
             </div>
             <p className="text-xs text-text-muted">Your account is secured with time-based one-time passwords.</p>
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setShow2faSetup(true)} className="text-xs border-border bg-bg-subtle">
-                Reconfigure Authenticator
+              <Button variant="outline" size="sm" onClick={handleStart2faSetup} disabled={isStarting2fa} className="text-xs border-border bg-bg-subtle">
+                {isStarting2fa ? "Generating..." : "Reconfigure Authenticator"}
               </Button>
               <Button variant="outline" size="sm" onClick={handleDisable2fa} className="text-xs border-critical/30 text-critical hover:bg-critical-muted">
                 Disable 2FA
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4 max-w-md">
-            <div className="flex justify-center p-4 bg-bg-subtle rounded-xl border border-border">
-              <div className="w-36 h-36 bg-white rounded-lg flex flex-col items-center justify-center p-2 text-center shadow-inner">
-                <div className="w-28 h-28 border-4 border-dashed border-black/30 rounded flex items-center justify-center text-[10px] text-black/60 font-mono">
-                  [QR CODE]
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-text-muted text-center">
-              Scan with Google Authenticator or 1Password, or enter key: <code className="text-primary font-mono font-bold">JBSWY3DPEHPK3PXP</code>
-            </p>
 
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Enter 6-digit code to verify"
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
-                className="text-center font-mono text-sm bg-bg-subtle border-border"
-                maxLength={6}
-              />
-              <Button onClick={handleVerifyTotp} size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
-                Verify & Enable
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShow2faSetup(false)} className="text-xs">
-                Cancel
-              </Button>
-            </div>
-
-            <div className="pt-2">
+            <div className="pt-2 border-t border-border/40">
               <Button
                 variant="ghost"
                 size="sm"
@@ -194,6 +216,47 @@ export default function SecuritySettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        ) : show2faSetup ? (
+          <div className="space-y-4 max-w-md">
+            <div className="flex justify-center p-4 bg-bg-subtle rounded-xl border border-border">
+              <div className="w-44 h-44 bg-white rounded-lg flex flex-col items-center justify-center p-2 text-center shadow-inner">
+                {qrCodeUrl ? (
+                  <img src={qrCodeUrl} alt="TOTP QR Code" className="w-40 h-40" />
+                ) : (
+                  <div className="w-36 h-36 border-4 border-dashed border-black/30 rounded flex items-center justify-center text-[10px] text-black/60 font-mono">
+                    Generating QR...
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-text-muted text-center">
+              Scan with Google Authenticator or 1Password, or enter key:{" "}
+              <code className="text-primary font-mono font-bold select-all">{secretKey || "..."}</code>
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Enter 6-digit code to verify"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                className="text-center font-mono text-sm bg-bg-subtle border-border"
+                maxLength={6}
+              />
+              <Button onClick={handleVerifyTotp} size="sm" className="bg-primary hover:bg-primary-hover text-white text-xs">
+                Verify & Enable
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShow2faSetup(false)} className="text-xs">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-text-muted">Two-factor authentication adds an extra layer of security to your hunter account.</p>
+            <Button size="sm" onClick={handleStart2faSetup} disabled={isStarting2fa} className="bg-primary hover:bg-primary-hover text-white text-xs">
+              {isStarting2fa ? "Generating QR..." : "Enable Two-Factor Authentication"}
+            </Button>
           </div>
         )}
       </Card>

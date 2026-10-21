@@ -25,24 +25,25 @@ import { ScreenshotGrid } from "@/components/recon/ScreenshotGrid"
 import { LiveLog } from "@/components/recon/LiveLog"
 import { FindingsTable } from "@/components/findings/FindingsTable"
 import { ReportBuilder } from "@/components/reports/ReportBuilder"
+import { useAuth } from "@/hooks/useAuth"
 import type { 
   Program, ScopeTarget, ScopeType, Subdomain, Port, 
   DiscoveredUrl, Finding, ScanJob, Hunter 
 } from "@/lib/types"
 
-const mockHunter: Hunter = {
-  id: "hunter-1",
-  username: "admin",
-  displayName: "Admin Hunter",
-  role: "admin",
-  totpEnabled: true,
-  active: true,
-  lastLogin: "Just now",
-  createdAt: "2026-01-01T00:00:00Z"
-}
-
 export default function ProgramDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const { user } = useAuth()
+  const currentHunter: Hunter = user || {
+    id: "00000000-0000-0000-0000-000000000001",
+    username: "admin",
+    displayName: "Admin Hunter",
+    role: "admin",
+    totpEnabled: true,
+    active: true,
+    lastLogin: "Just now",
+    createdAt: new Date().toISOString()
+  }
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState(0)
 
@@ -135,7 +136,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         targetType: (t.targetType || t.target_type || "domain") as ScopeType,
         targetValue: t.targetValue || t.target || "",
         inScope: t.inScope !== undefined ? t.inScope : !t.out_of_scope,
-        addedBy: typeof t.addedBy === "object" && t.addedBy !== null ? t.addedBy : mockHunter,
+        addedBy: typeof t.addedBy === "object" && t.addedBy !== null ? t.addedBy : currentHunter,
         addedAt: t.addedAt || (t.created_at ? new Date(t.created_at).toISOString() : new Date().toISOString()),
       }))
       setTargets(normalizedTargets)
@@ -214,7 +215,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         targetValue: newTarget.targetValue,
         inScope: newTarget.inScope,
         notes: newTarget.notes || null,
-        addedBy: mockHunter,
+        addedBy: currentHunter,
         addedAt: new Date().toISOString()
       }
       setTargets((prev) => [normalized, ...prev])
@@ -250,7 +251,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         status: "running",
         startedAt: "Just now",
         finishedAt: null,
-        triggeredBy: mockHunter,
+        triggeredBy: currentHunter,
         triggeredByScheduler: false,
         tool: stageName.toLowerCase().includes("vuln") ? "nuclei" : "recon-engine",
         scriptPath: `/tools/recon/${stageName.toLowerCase().replace(/[^a-z0-9]/g, "")}.sh`,

@@ -91,14 +91,15 @@ impl ToolRegistry {
     pub async fn check_all() -> Vec<ToolInfo> {
         let tools = [
             "subfinder",
-            "httpx",
-            "naabu",
-            "katana",
-            "nuclei",
             "dnsx",
-            "dalfox",
+            "naabu",
+            "httpx",
             "gau",
             "waybackurls",
+            "katana",
+            "nuclei",
+            "ffuf",
+            "dalfox",
         ];
         let mut list = Vec::new();
         for t in tools {
@@ -114,10 +115,18 @@ impl ToolRegistry {
 
     /// Query binary version with server-controlled argument and a tight 5-second timeout.
     /// Never invokes a shell.
-    async fn detect_version(path: &PathBuf, _name: &str) -> Option<String> {
+    async fn detect_version(path: &PathBuf, name: &str) -> Option<String> {
+        let flag = match name {
+            "ffuf" => "-V",
+            "dalfox" => "--version",
+            "waybackurls" => "-h",
+            "gau" => "--version",
+            _ => "-version",
+        };
+
         let output = tokio::time::timeout(
             tokio::time::Duration::from_secs(5),
-            tokio::process::Command::new(path).arg("-version").output(),
+            tokio::process::Command::new(path).arg(flag).output(),
         )
         .await
         .ok()?
@@ -129,7 +138,11 @@ impl ToolRegistry {
 
         for line in combined.lines() {
             let line_trim = line.trim();
-            if line_trim.contains("version") || line_trim.contains("Version") {
+            if line_trim.contains("projectdiscovery.io") || line_trim.is_empty() {
+                continue;
+            }
+            let lower = line_trim.to_lowercase();
+            if lower.contains("version") || lower.contains("dalfox") || lower.contains("usage") || lower.contains("fuzz") {
                 let parts: Vec<&str> = line_trim.split_whitespace().collect();
                 for part in parts {
                     let cleaned = part.trim_matches(|c: char| !c.is_alphanumeric() && c != '.');

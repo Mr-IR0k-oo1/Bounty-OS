@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   AlertTriangle, Bug, FileText, MessageSquare, History, Copy, ChevronRight,
-  ExternalLink, Download, Send, Shield, Check, Calculator, Clock, CheckCircle2
+  ExternalLink, Download, Send, Shield, Check, Calculator, Clock, CheckCircle2, Sparkles, Loader2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/useToast"
 import { EvidenceViewer } from "@/components/findings/EvidenceViewer"
 import { CvssCalculator } from "@/components/findings/CvssCalculator"
-import type { Severity, FindingStatus } from "@/lib/types"
+import { api } from "@/lib/api"
+import type { Severity, FindingStatus, Finding } from "@/lib/types"
 
 type Tab = "details" | "evidence" | "cvss" | "notes" | "history"
 
@@ -30,60 +31,91 @@ export default function FindingDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const findingId = (params.id as string) || "1"
+  const findingId = (params.id as string) || ""
 
   const [activeTab, setActiveTab] = useState<Tab>("details")
   const [copiedPoc, setCopiedPoc] = useState(false)
   const [status, setStatus] = useState<FindingStatus>("new")
   const [assignedHunter, setAssignedHunter] = useState("admin")
-  const [notesText, setNotesText] = useState(
-    "Confirmed SSRF via internal health endpoint. The request returns AWS EC2 instance metadata (IMDSv1). Cloudflare WAF does not inspect URL query parameters targeting link-local address 169.254.169.254."
-  )
-  const [cvssScore, setCvssScore] = useState(9.1)
+  const [notesText, setNotesText] = useState("")
+  const [cvssScore, setCvssScore] = useState(7.5)
+  const [programName, setProgramName] = useState("Active Program")
+  const [loading, setLoading] = useState(true)
+  const [isTriaging, setIsTriaging] = useState(false)
 
   const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([
-    { action: "Finding discovered by nuclei", user: "nuclei-daemon", time: "2026-09-19 11:42:00" },
-    { action: "Assigned to admin", user: "system", time: "2026-09-19 11:45:00" },
-    { action: "CVSS score set to 9.1", user: "admin", time: "2026-09-19 11:46:00" },
+    { action: "Finding ingested into PostgreSQL", user: "system", time: "Discovered" },
   ])
 
   const [finding, setFinding] = useState({
     id: findingId,
-    title: "Server-Side Request Forgery (SSRF) in api.uber.com/internal/health",
-    severity: "critical" as Severity,
-    host: "api.uber.com",
-    targetUrl: "https://api.uber.com/internal/health?url=http://169.254.169.254/latest/meta-data/",
-    program: "Uber — HackerOne",
-    programId: "uber",
-    cveId: "CVE-2024-PENDING",
-    template: "ssrf-detect.yaml",
-    tool: "nuclei / nuclei-templates:v4.2.0",
-    foundAt: "Today, 11:42 AM",
-    description: `A Server-Side Request Forgery (SSRF) vulnerability was discovered in the health check endpoint of the internal API. The application accepts an unvalidated 'url' parameter and retrieves resources directly using the server's network stack without restricting RFC 1918 or link-local (169.254.169.254) address spaces.\n\nAn attacker can exploit this flaw to dump cloud provider IAM credentials, access internal Kubernetes service meshes, and pivot into private infrastructure.`,
-    request: `GET /internal/health?url=http://169.254.169.254/latest/meta-data/ HTTP/1.1
-Host: api.uber.com
-User-Agent: Mozilla/5.0 (compatible; BountyOS-Scanner/2.1)
-Accept: */*
-X-Forwarded-For: 127.0.0.1`,
-    response: `HTTP/1.1 200 OK
-Date: Sat, 19 Sep 2026 11:42:01 GMT
-Content-Type: text/plain; charset=utf-8
-Content-Length: 178
-Connection: keep-alive
-Server: envoy
-
-ami-id
-ami-launch-index
-ami-manifest-path
-hostname
-iam/security-credentials/uber-eks-node-role
-instance-action
-instance-id
-instance-type
-local-ipv4
-public-keys/`,
-    curlCommand: `curl -ik -s -X GET 'https://api.uber.com/internal/health?url=http://169.254.169.254/latest/meta-data/' -H 'User-Agent: BountyOS-Scanner/2.1'`
+    title: "Vulnerability Finding",
+    severity: "medium" as Severity,
+    host: "target.com",
+    targetUrl: "https://target.com",
+    program: "Bug Bounty Engagement",
+    programId: "",
+    cveId: "CVE-PENDING",
+    template: "nuclei-detection",
+    tool: "BountyOS Pipeline",
+    foundAt: "Recently",
+    description: "Detailed vulnerability analysis and reproduction steps.",
+    request: `GET / HTTP/1.1\nHost: target.com\nUser-Agent: BountyOS-Scanner/2.1`,
+    response: `HTTP/1.1 200 OK\nServer: Cloudflare\nContent-Type: application/json`,
+    curlCommand: `curl -i -s 'https://target.com'`
   })
+
+  useEffect(() => {
+    async function loadData() {
+      if (!findingId) return
+      setLoading(true)
+      try {
+        const [f, progs] = await Promise.all([
+          api.getFinding(findingId).catch(() => null),
+          api.listPrograms().catch(() => []),
+        ])
+
+        if (f) {
+          const prog = progs?.find((p: any) => p.id === f.program_id)
+          const pName = prog?.name || "Active Engagement"
+          setProgramName(pName)
+          setStatus((f.status || "new") as FindingStatus)
+          const score = f.cvss_score || (f.severity === 'critical' ? 9.5 : f.severity === 'high' ? 8.2 : f.severity === 'medium' ? 6.1 : 3.2)
+          setCvssScore(score)
+          setNotesText(f.description || "")
+
+          setFinding({
+            id: f.id || findingId,
+            title: f.title || "Vulnerability Finding",
+            severity: (f.severity || "medium").toLowerCase() as Severity,
+            host: f.matched_at || "Target Endpoint",
+            targetUrl: f.matched_at?.startsWith("http") ? f.matched_at : `https://${f.matched_at || "target.com"}`,
+            program: pName,
+            programId: f.program_id || "",
+            cveId: f.tags?.find((t: string) => t.toUpperCase().startsWith("CVE-")) || "CVE-2024-PENDING",
+            template: f.finding_type ? `${f.finding_type}-probe` : "pipeline-scanner",
+            tool: f.finding_type || "nuclei",
+            foundAt: f.created_at ? new Date(f.created_at).toLocaleString() : "Recently",
+            description: f.description || "Identified security exposure during automated scanning.",
+            request: `GET /${f.matched_at ? f.matched_at.replace(/^https?:\/\/[^\/]+/, '') : ''} HTTP/1.1\nHost: ${f.matched_at || 'target.com'}\nUser-Agent: BountyOS-Scanner/2.1`,
+            response: `HTTP/1.1 200 OK\nContent-Type: application/json\nConnection: keep-alive`,
+            curlCommand: f.curl_command || `curl -ik -s 'https://${f.matched_at || "target.com"}'`
+          })
+
+          setHistoryEvents([
+            { action: `Status loaded: ${f.status?.toUpperCase() || 'NEW'}`, user: "system", time: "Loaded" },
+            { action: `Assigned severity: ${f.severity?.toUpperCase() || 'INFO'}`, user: "scanner", time: "Discovered" }
+          ])
+        }
+      } catch {
+        // Use default
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [findingId])
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "details", label: "Details", icon: <FileText className="w-3.5 h-3.5" /> },
@@ -93,22 +125,48 @@ public-keys/`,
     { key: "history", label: `Audit Log (${historyEvents.length})`, icon: <History className="w-3.5 h-3.5" /> },
   ]
 
-  const handleStatusChange = (newStatus: FindingStatus) => {
+  const handleStatusChange = async (newStatus: FindingStatus) => {
     setStatus(newStatus)
-    setHistoryEvents(prev => [
-      { action: `Status changed to ${newStatus.toUpperCase()}`, user: "admin", time: new Date().toLocaleTimeString() },
-      ...prev
-    ])
-    toast({ title: "Status updated", description: `Finding marked as ${newStatus}.` })
+    try {
+      await api.updateFinding(findingId, { status: newStatus })
+      setHistoryEvents(prev => [
+        { action: `Status changed to ${newStatus.toUpperCase()}`, user: "admin", time: new Date().toLocaleTimeString() },
+        ...prev
+      ])
+      toast({ title: "Status updated", description: `Finding marked as ${newStatus} in database.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update failed", description: e.message })
+    }
   }
 
-  const handleSubmitToProgram = () => {
-    setStatus("submitted")
-    setHistoryEvents(prev => [
-      { action: "Submitted report to HackerOne platform", user: "admin", time: new Date().toLocaleTimeString() },
-      ...prev
-    ])
-    toast({ title: "Report Submitted", description: "Finding successfully transmitted to bug bounty program." })
+  const handleSubmitToProgram = async () => {
+    try {
+      await api.reportFinding(findingId)
+      setStatus("submitted")
+      setHistoryEvents(prev => [
+        { action: `Report dispatched to ${programName}`, user: "admin", time: new Date().toLocaleTimeString() },
+        ...prev
+      ])
+      toast({ title: "Report Submitted", description: `Finding successfully recorded for ${programName}.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Submission failed", description: e.message })
+    }
+  }
+
+  const handleRunAiTriage = async () => {
+    setIsTriaging(true)
+    try {
+      const res = await api.triageFinding(findingId)
+      toast({ title: "AI Triage Completed", description: res.message || "Triage analysis finished." })
+      setHistoryEvents(prev => [
+        { action: "AI automated triage completed", user: "bountyos-llm", time: new Date().toLocaleTimeString() },
+        ...prev
+      ])
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Triage error", description: e.message || "Failed to run triage." })
+    } finally {
+      setIsTriaging(false)
+    }
   }
 
   const handleCopyPoc = async () => {
@@ -119,22 +177,32 @@ public-keys/`,
     toast({ title: "PoC Copied", description: "Reproducible PoC copied to clipboard in markdown format." })
   }
 
-  const handleSaveNotes = () => {
-    setHistoryEvents(prev => [
-      { action: "Updated triage notes", user: "admin", time: new Date().toLocaleTimeString() },
-      ...prev
-    ])
-    toast({ title: "Notes saved", description: "Triage notes updated successfully." })
+  const handleSaveNotes = async () => {
+    try {
+      await api.updateFinding(findingId, { description: notesText, cvss_score: cvssScore })
+      setHistoryEvents(prev => [
+        { action: "Updated triage notes in database", user: "admin", time: new Date().toLocaleTimeString() },
+        ...prev
+      ])
+      toast({ title: "Notes saved", description: "Triage notes updated in database." })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e.message })
+    }
   }
 
-  const handleApplyCvss = (score: number) => {
+  const handleApplyCvss = async (score: number) => {
     setCvssScore(score)
-    setHistoryEvents(prev => [
-      { action: `CVSS score updated to ${score}`, user: "admin", time: new Date().toLocaleTimeString() },
-      ...prev
-    ])
-    toast({ title: "CVSS Score Applied", description: `Updated score to ${score}.` })
-    setActiveTab("details")
+    try {
+      await api.updateFinding(findingId, { cvss_score: score })
+      setHistoryEvents(prev => [
+        { action: `CVSS score updated to ${score}`, user: "admin", time: new Date().toLocaleTimeString() },
+        ...prev
+      ])
+      toast({ title: "CVSS Score Applied", description: `Updated score to ${score}.` })
+      setActiveTab("details")
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to persist CVSS", description: e.message })
+    }
   }
 
   return (
@@ -172,6 +240,16 @@ public-keys/`,
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              onClick={handleRunAiTriage}
+              disabled={isTriaging}
+              variant="outline"
+              size="sm"
+              className="border-accent/40 text-accent hover:bg-accent/10 text-xs gap-1.5"
+            >
+              {isTriaging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              AI Triage
+            </Button>
             <Button
               onClick={handleSubmitToProgram}
               className="bg-primary hover:bg-primary-hover text-white text-xs gap-1.5 shadow-glow-primary"

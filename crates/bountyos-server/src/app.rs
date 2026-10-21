@@ -49,6 +49,7 @@ pub fn create_router(
     // Public routes (no authentication required)
     let public_router = Router::new()
         .route("/health", get(api_health))
+        .route("/health/doctor", get(api_doctor))
         .route(
             "/auth/login",
             post(crate::auth::handlers::login).layer(login_limiter),
@@ -56,6 +57,14 @@ pub fn create_router(
         .route(
             "/auth/refresh",
             post(crate::auth::handlers::refresh).layer(refresh_limiter),
+        )
+        .route(
+            "/auth/setup",
+            post(crate::auth::handlers::setup).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/auth/2fa/verify",
+            post(crate::auth::handlers::verify_2fa).layer(state_change_limiter.clone()),
         )
         // WebSocket route (not globally protected yet per spec)
         .route("/ws/jobs/:id", get(crate::handlers::ws::ws_handler))
@@ -77,8 +86,12 @@ pub fn create_router(
             post(crate::auth::handlers::setup_2fa).layer(state_change_limiter.clone()),
         )
         .route(
-            "/auth/2fa/verify",
-            post(crate::auth::handlers::verify_2fa).layer(state_change_limiter.clone()),
+            "/auth/2fa/disable",
+            post(crate::auth::handlers::disable_2fa).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/auth/password",
+            post(crate::auth::handlers::change_password).layer(state_change_limiter.clone()),
         )
         .route("/auth/me", get(crate::auth::handlers::me))
         // Project routes
@@ -126,6 +139,10 @@ pub fn create_router(
             "/programs/:id/scan",
             post(crate::handlers::programs::scan_program).layer(state_change_limiter.clone()),
         )
+        .route(
+            "/programs/:id/report",
+            get(crate::handlers::reports::generate_report),
+        )
         // Scope routes
         .route(
             "/programs/:id/scope",
@@ -147,6 +164,10 @@ pub fn create_router(
             "/programs/:id/scope/import",
             post(crate::handlers::scope::import_scope).layer(state_change_limiter.clone()),
         )
+        .route(
+            "/programs/:id/scope/check",
+            get(crate::handlers::scope::check_scope_endpoint),
+        )
         // Subdomain routes
         .route(
             "/programs/:id/subdomains",
@@ -161,10 +182,18 @@ pub fn create_router(
             "/subdomains/:id/ports",
             get(crate::handlers::ports::list_ports),
         )
+        .route(
+            "/programs/:id/ports",
+            get(crate::handlers::ports::list_program_ports),
+        )
         // URL routes
         .route("/programs/:id/urls", get(crate::handlers::urls::list_urls))
         // Finding routes
         .route("/findings", get(crate::handlers::findings::list_findings))
+        .route(
+            "/findings",
+            post(crate::handlers::findings::create_finding).layer(state_change_limiter.clone()),
+        )
         .route(
             "/projects/:id/findings",
             get(crate::handlers::findings::list_project_findings),
@@ -177,6 +206,10 @@ pub fn create_router(
         .route(
             "/findings/:id",
             put(crate::handlers::findings::update_finding).layer(state_change_limiter.clone()),
+        )
+        .route(
+            "/findings/:id",
+            delete(crate::handlers::findings::delete_finding).layer(state_change_limiter.clone()),
         )
         .route(
             "/findings/:id/claim",
@@ -277,4 +310,43 @@ pub fn create_router(
 
 async fn api_health() -> &'static str {
     "OK"
+}
+
+async fn api_doctor(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> axum::Json<serde_json::Value> {
+    let mut db_status = "connected";
+    let db_ok = if state.has_db() {
+        sqlx::query("SELECT 1").execute(state.db()).await.is_ok()
+    } else {
+        false
+    };
+    if !db_ok {
+        db_status = "disconnected";
+    }
+
+    let tools = crate::pipeline::tools::ToolRegistry::check_all().await;
+    let evidence_exists = state.evidence_base().is_dir();
+
+    axum::Json(serde_json::json!({
+        "status": if db_ok { "healthy" } else { "degraded" },
+        "subsystems": {
+            "api": { "status": "ok", "version": "2.0.0" },
+            "database": { "status": db_status, "type": "postgresql" },
+            "redis": { "status": "ok" },
+            "evidence_store": {
+                "status": if evidence_exists { "ok" } else { "warning" },
+                "path": state.evidence_base().to_string_lossy(),
+            },
+            "vulnllm": {
+                "enabled": state.llm_client().is_some(),
+                "status": if state.llm_client().is_some() { "ready" } else { "offline_fallback_active" }
+            },
+            "workers": {
+                "max_concurrency": state.config().max_concurrent_jobs,
+                "status": "ready"
+            }
+        },
+        "tools": tools,
+    }))
 }

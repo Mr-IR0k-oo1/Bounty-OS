@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
   XCircle,
   X,
   ExternalLink,
+  RefreshCw
 } from "lucide-react"
 import { KanbanBoard } from "@/components/projects/KanbanBoard"
 import { ProjectNotes } from "@/components/projects/ProjectNotes"
@@ -31,120 +32,92 @@ import { ProgramForm } from "@/components/programs/ProgramForm"
 import { useToast } from "@/hooks/useToast"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
+import type { Project, Program, Finding, Hunter } from "@/lib/types"
 
 export default function ProjectOverviewPage() {
   const params = useParams()
-  const projectId = (params.projectId as string) || "1"
+  const rawId = (params.projectId as string) || ""
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"overview" | "programs" | "kanban" | "notes" | "timeline" | "team">("overview")
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const sp = new URLSearchParams(window.location.search)
-      const tabParam = sp.get("tab")
-      if (tabParam && ["overview", "programs", "kanban", "notes", "timeline", "team"].includes(tabParam)) {
-        setActiveTab(tabParam as any)
-      }
-    }
-  }, [])
-
-  const [projectData, setProjectData] = useState({
+  const [loading, setLoading] = useState(true)
+  const [resolvedProjectId, setResolvedProjectId] = useState<string>(rawId)
+  const [projectData, setProjectData] = useState<{
+    id: string
+    name: string
+    status: string
+    description: string
+  }>({
+    id: rawId,
     name: "Loading Project...",
     status: "Active",
     description: "",
   })
 
-  useEffect(() => {
-    if (!projectId) return
-    api.getProject(projectId)
-      .then((p) => {
-        if (p) {
-          const isActive = p.active !== undefined ? p.active : p.status !== "archived"
-          setProjectData({
-            name: p.name,
-            status: isActive ? "Active" : "Archived",
-            description: p.description || "Bug bounty engagement container.",
-          })
-        }
-      })
-      .catch((err) => {
-        // Fallback for non-UUID / demo IDs
-        if (projectId === "1" || projectId === "2" || projectId === "3") {
-          setProjectData({
-            name: "Q1 2025 Engagements",
-            status: "Active",
-            description: "Top-tier private invite-only bug bounty engagements and assets.",
-          })
-        }
-      })
-  }, [projectId])
+  const [programsList, setProgramsList] = useState<Program[]>([])
+  const [findingsList, setFindingsList] = useState<Finding[]>([])
+  const [teamMembers, setTeamMembers] = useState<Hunter[]>([])
 
-  // Programs state
-  const [programsList, setProgramsList] = useState([
-    { id: "1", name: "Uber", platform: "HackerOne", status: "active", targets: 142, lastScan: "2m ago" },
-    { id: "2", name: "Airbnb", platform: "Bugcrowd", status: "active", targets: 89, lastScan: "15m ago" },
-    { id: "3", name: "Twitter", platform: "HackerOne", status: "active", targets: 203, lastScan: "1h ago" },
-  ])
-
-  // Notes state
-  const defaultHunter: any = {
-    id: "h1",
-    username: "admin",
-    displayName: "Admin Hunter",
-    role: "admin",
-    totpEnabled: true,
-    active: true,
-    lastLogin: "Just now",
-    createdAt: "2025-01-01T00:00:00Z",
-  }
-
-  const [notesList, setNotesList] = useState<any[]>([
-    {
-      id: "n1",
-      projectId,
-      hunterId: "h1",
-      title: "Recon & Scope Strategy",
-      content: "## Recon Strategy\n\n- Subdomain enumeration using subfinder with passive sources\n- Active validation with httpx\n- Exclude `corp.*` and internal testing endpoints.",
-      tags: ["methodology", "scope"],
-      createdBy: defaultHunter,
-      createdAt: "2025-02-01T10:00:00Z",
-      updatedAt: "2025-02-15T14:30:00Z",
-    },
-    {
-      id: "n2",
-      projectId,
-      hunterId: "h1",
-      title: "High Value Endpoints",
-      content: "### API Endpoints\n\n- `/api/v1/auth/oauth/token`\n- `/internal/health?url=` (SSRF candidate)\n- `/checkout/cart/apply-coupon`",
-      tags: ["endpoints", "findings"],
-      createdBy: defaultHunter,
-      createdAt: "2025-02-10T12:00:00Z",
-      updatedAt: "2025-02-18T09:15:00Z",
-    },
-  ])
-
-  // Timeline state
-  const [timelineEvents, setTimelineEvents] = useState<any[]>([
-    { id: "e1", type: "scan", message: "Stage 2 Validation completed on Uber", timestamp: "2025-04-10T14:23:00Z", programName: "Uber" },
-    { id: "e2", type: "finding", message: "Critical SSRF discovered on api.uber.com", timestamp: "2025-04-10T14:25:00Z", programName: "Uber", severity: "critical" },
-    { id: "e3", type: "submission", message: "Report submitted to HackerOne: SSRF", timestamp: "2025-04-11T09:15:00Z", programName: "Uber" },
-    { id: "e4", type: "bounty", message: "Bounty awarded: $2,500 on Uber SSRF", timestamp: "2025-04-12T16:00:00Z", programName: "Uber" },
-    { id: "e5", type: "status_change", message: "Project milestones updated for Q1", timestamp: "2025-04-13T10:00:00Z" },
-  ])
-
-  // Team state
-  const [teamMembers, setTeamMembers] = useState([
-    { id: "h1", username: "admin", displayName: "Admin Hunter", role: "admin", twoFactor: true, lastLogin: "Just now" },
-    { id: "h2", username: "hunter1", displayName: "Alice Smith", role: "hunter", twoFactor: true, lastLogin: "15m ago" },
-    { id: "h3", username: "hunter2", displayName: "Bob Jones", role: "hunter", twoFactor: false, lastLogin: "1h ago" },
-    { id: "h4", username: "hunter3", displayName: "Carol White", role: "hunter", twoFactor: true, lastLogin: "1d ago" },
-  ])
-
-  // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddProgramOpen, setIsAddProgramOpen] = useState(false)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [newMemberUsername, setNewMemberUsername] = useState("")
+
+  // Notes state
+  const [notesList, setNotesList] = useState<any[]>([])
+
+  const loadProjectDetails = useCallback(async () => {
+    setLoading(true)
+    try {
+      let pId = rawId
+      // If given numeric id or non-uuid, resolve to first real project in DB
+      let p: Project | null = null
+      if (rawId && rawId.includes("-")) {
+        try {
+          p = await api.getProject(rawId)
+        } catch {
+          p = null
+        }
+      }
+
+      if (!p) {
+        const allProjects = await api.listProjects()
+        if (allProjects && allProjects.length > 0) {
+          p = allProjects[0]
+          pId = p.id
+        }
+      }
+
+      if (p) {
+        setResolvedProjectId(p.id)
+        const isActive = p.active !== undefined ? p.active : p.status !== "archived"
+        setProjectData({
+          id: p.id,
+          name: p.name,
+          status: isActive ? "Active" : "Archived",
+          description: p.description || "Bug bounty engagement workspace.",
+        })
+
+        const [progs, finds, hunters] = await Promise.all([
+          api.listPrograms(p.id).catch(() => []),
+          api.listProjectFindings(p.id).catch(() => []),
+          api.listHunters().catch(() => []),
+        ])
+
+        setProgramsList(progs || [])
+        setFindingsList(finds || [])
+        setTeamMembers(hunters || [])
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to load project", description: e.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [rawId, toast])
+
+  useEffect(() => {
+    loadProjectDetails()
+  }, [loadProjectDetails])
 
   const tabs: { key: typeof activeTab; label: string }[] = [
     { key: "overview", label: "Overview" },
@@ -158,12 +131,10 @@ export default function ProjectOverviewPage() {
   const handleSaveNote = async (note: any) => {
     const updated = {
       id: note.id || `n-${Date.now()}`,
-      projectId,
-      hunterId: "h1",
+      projectId: resolvedProjectId,
       title: note.title || "Untitled Note",
       content: note.content || "",
       tags: note.tags || ["general"],
-      createdBy: defaultHunter,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -176,44 +147,55 @@ export default function ProjectOverviewPage() {
       }
       return [updated, ...prev]
     })
-    toast({ title: "Note saved", description: `"${updated.title}" was saved successfully.` })
+    toast({ title: "Note saved", description: `"${updated.title}" saved successfully.` })
   }
 
   const handleDeleteNote = async (id: string) => {
     setNotesList((prev) => prev.filter((n) => n.id !== id))
-    toast({ title: "Note deleted", description: "The note has been removed." })
+    toast({ title: "Note deleted" })
   }
 
   const handleAddProgramSubmit = async (data: any) => {
-    const newProg = {
-      id: String(Date.now()),
-      name: data.name,
-      platform: data.platform === "h1" ? "HackerOne" : data.platform === "bugcrowd" ? "Bugcrowd" : data.platform === "intigriti" ? "Intigriti" : "Other",
-      status: "active",
-      targets: 0,
-      lastScan: "Just now",
+    try {
+      const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+      const created = await api.createProgram(resolvedProjectId, {
+        name: data.name,
+        slug: slug || "program",
+        platform: data.platform || "other",
+        programUrl: data.programUrl || null,
+        bountyRangeLow: data.bountyRangeLow ?? null,
+        bountyRangeHigh: data.bountyRangeHigh ?? null,
+        notes: data.notes || null,
+      })
+      setProgramsList((prev) => [...prev, created])
+      setIsAddProgramOpen(false)
+      toast({ title: "Program added", description: `${created.name} enrolled into project.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to add program", description: e.message })
     }
-    setProgramsList((prev) => [newProg, ...prev])
-    setIsAddProgramOpen(false)
-    toast({ title: "Program added", description: `${data.name} added to ${projectData.name}.` })
   }
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMemberUsername.trim()) return
-    const newMem = {
-      id: `h-${Date.now()}`,
-      username: newMemberUsername.toLowerCase().replace(/\s+/g, ""),
-      displayName: newMemberUsername,
-      role: "hunter",
-      twoFactor: false,
-      lastLogin: "Never",
+    try {
+      const created = await api.createHunter({
+        username: newMemberUsername.toLowerCase().replace(/\s+/g, ""),
+        display_name: newMemberUsername.trim(),
+        role: "hunter",
+      })
+      setTeamMembers((prev) => [...prev, created])
+      setNewMemberUsername("")
+      setIsAddMemberOpen(false)
+      toast({ title: "Hunter assigned", description: `${created.displayName} joined this project.` })
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Assignment failed", description: e.message })
     }
-    setTeamMembers((prev) => [...prev, newMem])
-    setNewMemberUsername("")
-    setIsAddMemberOpen(false)
-    toast({ title: "Hunter assigned", description: `${newMemberUsername} joined this project.` })
   }
+
+  const totalFindingsCount = findingsList.length
+  const submittedCount = findingsList.filter(f => f.status === "submitted" || f.status === "bounty_awarded").length
+  const validatedCount = findingsList.filter(f => f.status === "validated").length
 
   return (
     <div className="space-y-6">
@@ -234,14 +216,25 @@ export default function ProjectOverviewPage() {
               {projectData.status}
             </span>
           </h1>
+          <p className="text-xs text-text-muted mt-1">{projectData.description}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => setIsEditModalOpen(true)}>Edit</Button>
+          <Button variant="outline" size="sm" onClick={() => loadProjectDetails()} className="gap-1.5 text-xs">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} /> Refresh
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setIsEditModalOpen(true)}>Edit</Button>
           <Button
+            size="sm"
             className="btn-primary"
-            onClick={() => {
-              setProjectData((prev) => ({ ...prev, status: prev.status === "Active" ? "Archived" : "Active" }))
-              toast({ title: "Status updated", description: `Project is now ${projectData.status === "Active" ? "Archived" : "Active"}.` })
+            onClick={async () => {
+              const newActive = projectData.status !== "Active"
+              try {
+                await api.updateProject(resolvedProjectId, { active: newActive })
+                setProjectData((prev) => ({ ...prev, status: newActive ? "Active" : "Archived" }))
+                toast({ title: "Status updated", description: `Project is now ${newActive ? "Active" : "Archived"}.` })
+              } catch (e: any) {
+                toast({ variant: "destructive", title: "Update failed", description: e.message })
+              }
             }}
           >
             {projectData.status === "Active" ? "Archive Project" : "Activate Project"}
@@ -254,14 +247,7 @@ export default function ProjectOverviewPage() {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => {
-              setActiveTab(tab.key)
-              if (typeof window !== "undefined") {
-                const url = new URL(window.location.href)
-                url.searchParams.set("tab", tab.key)
-                window.history.replaceState(null, "", url.toString())
-              }
-            }}
+            onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               activeTab === tab.key
                 ? "bg-bg-elevated text-text-primary shadow-sm"
@@ -279,10 +265,10 @@ export default function ProjectOverviewPage() {
           <div className="col-span-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
               { label: "Programs", value: String(programsList.length), icon: Globe, color: "text-primary" },
-              { label: "Total Findings", value: "47", icon: Bug, color: "text-critical" },
+              { label: "Total Findings", value: String(totalFindingsCount), icon: Bug, color: "text-critical" },
               { label: "Hunters", value: String(teamMembers.length), icon: Users, color: "text-accent" },
-              { label: "Submitted", value: "12", icon: FileText, color: "text-medium" },
-              { label: "Bounties Earned", value: "$8,500", icon: TrendingUp, color: "text-low" },
+              { label: "Validated", value: String(validatedCount), icon: Shield, color: "text-low" },
+              { label: "Submitted", value: String(submittedCount), icon: FileText, color: "text-medium" },
             ].map((stat) => (
               <Card key={stat.label} className="p-4 bg-bg-elevated border border-border">
                 <div className="flex items-center gap-2 mb-2">
@@ -299,11 +285,9 @@ export default function ProjectOverviewPage() {
               <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Finding Funnel</h2>
               <div className="space-y-3">
                 {[
-                  { label: "Total Discovered", count: 189, pct: 100 },
-                  { label: "Validated", count: 47, pct: 25 },
-                  { label: "Submitted", count: 12, pct: 6 },
-                  { label: "Accepted", count: 8, pct: 4 },
-                  { label: "Bounty Paid", count: 5, pct: 3 },
+                  { label: "Total Discovered", count: totalFindingsCount, pct: 100 },
+                  { label: "Validated", count: validatedCount, pct: totalFindingsCount > 0 ? Math.round((validatedCount / totalFindingsCount) * 100) : 0 },
+                  { label: "Submitted", count: submittedCount, pct: totalFindingsCount > 0 ? Math.round((submittedCount / totalFindingsCount) * 100) : 0 },
                 ].map((stage) => (
                   <div key={stage.label} className="flex items-center gap-4">
                     <span className="w-32 text-xs text-text-secondary">{stage.label}</span>
@@ -318,62 +302,38 @@ export default function ProjectOverviewPage() {
 
             <Card className="p-5 bg-bg-elevated border border-border">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider">Top Unsubmitted Findings</h2>
+                <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider">Project Findings</h2>
                 <Link href="/findings" className="text-xs text-primary hover:underline flex items-center gap-1">
                   View All Findings <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="space-y-2.5">
-                {[
-                  { id: "1", title: "SSRF in api.uber.com/internal/health", severity: "critical", hunter: "hunter1" },
-                  { id: "2", title: "SQLi in /rides/search?q=", severity: "high", hunter: "hunter2" },
-                  { id: "3", title: "Reflected XSS in /profile/search", severity: "medium", hunter: "hunter1" },
-                  { id: "4", title: "IDOR in user profile API", severity: "high", hunter: "hunter3" },
-                ].map((f) => (
+                {findingsList.slice(0, 5).map((f) => (
                   <div key={f.id} className="flex items-center justify-between p-3 rounded-xl bg-bg-subtle hover:bg-bg-overlay transition-colors">
                     <div className="flex items-center gap-3">
                       <span className={`w-2 h-2 rounded-full ${
                         f.severity === "critical" ? "bg-critical" :
                         f.severity === "high" ? "bg-high" : "bg-medium"
                       }`} />
-                      <Link href={`/findings/${f.id}`} className="text-xs font-semibold text-text-primary hover:text-primary transition-colors">
+                      <span className="text-xs font-semibold text-text-primary">
                         {f.title}
-                      </Link>
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-mono text-text-muted">@{f.hunter}</span>
-                      <Link href={`/findings/${f.id}`}>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs">Inspect</Button>
-                      </Link>
+                      <span className="text-[11px] font-mono text-text-muted">
+                        {f.matched_at || f.status}
+                      </span>
                     </div>
                   </div>
                 ))}
+                {findingsList.length === 0 && (
+                  <div className="text-xs text-text-muted py-6 text-center">No findings recorded in this project yet.</div>
+                )}
               </div>
             </Card>
           </div>
 
           <div className="col-span-12 lg:col-span-4 space-y-4">
-            <Card className="p-5 bg-bg-elevated border border-border">
-              <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Recent Activity</h2>
-              <div className="space-y-4">
-                {[
-                  { icon: Activity, text: "nuclei scan completed on Uber", time: "5m ago", color: "text-accent" },
-                  { icon: Bug, text: "Critical finding discovered in Uber", time: "15m ago", color: "text-critical" },
-                  { icon: Globe, text: "Airbnb program added to project", time: "1h ago", color: "text-primary" },
-                  { icon: TrendingUp, text: "Bounty received: $500 — XSS", time: "3h ago", color: "text-accent" },
-                  { icon: Users, text: "hunter3 joined the project", time: "1d ago", color: "text-text-muted" },
-                ].map((event, i) => (
-                  <div key={i} className="flex gap-3 text-sm">
-                    <event.icon className={`w-4 h-4 mt-0.5 ${event.color} shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-text-secondary text-xs">{event.text}</p>
-                      <p className="text-text-muted text-[10px] mt-0.5">{event.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
             <Card className="p-5 bg-bg-elevated border border-border">
               <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">Quick Actions</h2>
               <div className="space-y-2">
@@ -414,17 +374,28 @@ export default function ProjectOverviewPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="font-semibold text-text-primary text-base">{program.name}</h3>
-                      <span className="badge bg-primary-muted text-primary text-xs mt-1 inline-block">{program.platform}</span>
+                      <span className="badge bg-primary-muted text-primary text-xs mt-1 inline-block capitalize">{program.platform}</span>
                     </div>
-                    <span className="badge bg-accent-muted text-accent text-xs capitalize">{program.status}</span>
+                    <span className="badge bg-accent-muted text-accent text-xs capitalize">
+                      {program.active !== false ? "active" : "archived"}
+                    </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-text-muted pt-3 border-t border-border">
-                    <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-text-secondary" /> {program.targets} targets</span>
-                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-text-secondary" /> {program.lastScan}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-text-secondary" /> {program.targets ?? (program.stats?.subdomainCount || 0)} targets
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-text-secondary" /> {program.lastScan || (program.lastScannedAt ? "Scanned" : "Ready")}
+                    </span>
                   </div>
                 </Card>
               </Link>
             ))}
+            {programsList.length === 0 && (
+              <div className="col-span-full p-8 text-center text-xs text-text-muted border border-dashed rounded-xl">
+                No programs in this project. Click Add Program to enroll a target.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -432,7 +403,7 @@ export default function ProjectOverviewPage() {
       {/* TAB 3: KANBAN */}
       {activeTab === "kanban" && (
         <div className="animate-in fade-in duration-150">
-          <KanbanBoard projectId={projectId} />
+          <KanbanBoard projectId={resolvedProjectId} />
         </div>
       )}
 
@@ -446,7 +417,17 @@ export default function ProjectOverviewPage() {
       {/* TAB 5: TIMELINE */}
       {activeTab === "timeline" && (
         <div className="animate-in fade-in duration-150">
-          <ProjectTimeline events={timelineEvents} onRefresh={() => toast({ title: "Timeline refreshed", description: "Loaded latest engagement events." })} />
+          <ProjectTimeline
+            events={findingsList.map(f => ({
+              id: f.id,
+              type: "finding",
+              message: `${f.title} (${f.severity})`,
+              timestamp: f.created_at || (f as any).foundAt || new Date().toISOString(),
+              programName: projectData.name,
+              severity: f.severity,
+            }))}
+            onRefresh={() => loadProjectDetails()}
+          />
         </div>
       )}
 
@@ -456,7 +437,7 @@ export default function ProjectOverviewPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-text-primary">Project Hunters</h2>
-              <p className="text-xs text-text-muted mt-0.5">Assigned researchers and admins working this engagement</p>
+              <p className="text-xs text-text-muted mt-0.5">Assigned researchers and operators</p>
             </div>
             <Button onClick={() => setIsAddMemberOpen(true)} className="btn-primary flex items-center gap-1.5 text-xs">
               <Plus className="w-3.5 h-3.5" /> Assign Hunter
@@ -471,7 +452,6 @@ export default function ProjectOverviewPage() {
                   <th className="px-4 py-3 text-left">Role</th>
                   <th className="px-4 py-3 text-left">2FA Status</th>
                   <th className="px-4 py-3 text-left">Last Active</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -485,7 +465,7 @@ export default function ProjectOverviewPage() {
                       <span className="badge bg-primary-muted text-primary text-xs capitalize">{member.role}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {member.twoFactor ? (
+                      {member.totpEnabled ? (
                         <span className="flex items-center gap-1.5 text-xs text-accent">
                           <CheckCircle2 className="w-4 h-4" /> Enabled
                         </span>
@@ -495,19 +475,8 @@ export default function ProjectOverviewPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-text-muted">{member.lastLogin}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-critical hover:bg-critical/10"
-                        onClick={() => {
-                          setTeamMembers((prev) => prev.filter((m) => m.id !== member.id))
-                          toast({ title: "Hunter removed", description: `${member.displayName} removed from project.` })
-                        }}
-                      >
-                        Remove
-                      </Button>
+                    <td className="px-4 py-3 text-xs text-text-muted">
+                      {member.lastLogin ? new Date(member.lastLogin).toLocaleDateString() : "Active"}
                     </td>
                   </tr>
                 ))}
@@ -538,7 +507,15 @@ export default function ProjectOverviewPage() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-                <Button className="btn-primary" onClick={() => { setIsEditModalOpen(false); toast({ title: "Project updated", description: "Details saved." }) }}>
+                <Button className="btn-primary" onClick={async () => {
+                  try {
+                    await api.updateProject(resolvedProjectId, { name: projectData.name, description: projectData.description })
+                    setIsEditModalOpen(false)
+                    toast({ title: "Project updated", description: "Details saved." })
+                  } catch (e: any) {
+                    toast({ variant: "destructive", title: "Update failed", description: e.message })
+                  }
+                }}>
                   Save Changes
                 </Button>
               </div>
@@ -571,7 +548,7 @@ export default function ProjectOverviewPage() {
                 <label className="text-xs font-semibold text-text-secondary">Hunter Name / Handle</label>
                 <Input
                   required
-                  placeholder="e.g. David Miller or @dmiller"
+                  placeholder="e.g. David Miller"
                   value={newMemberUsername}
                   onChange={(e) => setNewMemberUsername(e.target.value)}
                   className="mt-1"

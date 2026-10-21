@@ -23,3 +23,22 @@ pub async fn list_ports(
 
     Ok(Json(ports))
 }
+
+pub async fn list_program_ports(
+    State(state): State<AppState>,
+    Path(program_id): Path<Uuid>,
+) -> Result<Json<Vec<Port>>, StatusCode> {
+    let pool = state.db();
+    let ports =
+        sqlx::query_as::<_, Port>("SELECT * FROM ports WHERE program_id = $1 ORDER BY port ASC")
+            .bind(program_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to list program ports: {e}");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    Ok(Json(ports))
+}
+

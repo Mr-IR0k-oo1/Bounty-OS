@@ -453,3 +453,88 @@ pub async fn get_finding_triage(
         )),
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CreateFindingRequest {
+    pub program_id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub severity: Option<String>,
+    pub status: Option<String>,
+    pub matched_at: Option<String>,
+    pub finding_type: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub cvss_score: Option<f32>,
+    pub assigned_to: Option<Uuid>,
+}
+
+pub async fn create_finding(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateFindingRequest>,
+) -> Result<Json<Finding>, (StatusCode, Json<serde_json::Value>)> {
+    if !state.has_db() {
+        return Err((
+            StatusCode::NOT_IMPLEMENTED,
+            Json(serde_json::json!({"error": "Database not connected"})),
+        ));
+    }
+    let pool = state.db();
+    let severity = payload.severity.unwrap_or_else(|| "medium".to_string());
+    let status = payload.status.unwrap_or_else(|| "new".to_string());
+    let finding_type = payload.finding_type.unwrap_or_else(|| "vulnerability".to_string());
+    let tags = payload.tags.unwrap_or_default();
+
+    let finding = sqlx::query_as::<_, Finding>(
+        r#"INSERT INTO findings (
+            program_id, title, description, severity, status, finding_type,
+            matched_at, tags, cvss_score, assigned_to
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *"#,
+    )
+    .bind(payload.program_id)
+    .bind(payload.title)
+    .bind(payload.description)
+    .bind(severity)
+    .bind(status)
+    .bind(finding_type)
+    .bind(payload.matched_at)
+    .bind(tags)
+    .bind(payload.cvss_score)
+    .bind(payload.assigned_to)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to create finding: {e}");
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("Failed to create finding: {e}")})),
+        )
+    })?;
+
+    Ok(Json(finding))
+}
+
+pub async fn delete_finding(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    if !state.has_db() {
+        return Err((
+            StatusCode::NOT_IMPLEMENTED,
+            Json(serde_json::json!({"error": "Database not connected"})),
+        ));
+    }
+    let pool = state.db();
+    sqlx::query("DELETE FROM findings WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Finding not found"})),
+            )
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}

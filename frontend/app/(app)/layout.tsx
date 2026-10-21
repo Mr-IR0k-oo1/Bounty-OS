@@ -1,13 +1,23 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Sidebar from "@/components/layout/Sidebar"
 import TopBar from "@/components/layout/TopBar"
-import { Menu } from "lucide-react"
+import { Menu, ShieldAlert } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const { user, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [loading, user, router])
 
   // Load saved sidebar state from localStorage so it stays collapsed across page changes & reloads
   useEffect(() => {
@@ -44,6 +54,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
   }, [toggleSidebar])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg-surface/90 text-text-primary">
+        <div className="flex flex-col items-center gap-3">
+          <ShieldAlert className="w-8 h-8 text-primary animate-pulse" />
+          <div className="text-xs text-text-muted font-mono uppercase tracking-wider">
+            Loading BountyOS Session...
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-surface/80 backdrop-blur-[1.5px] text-text-primary">

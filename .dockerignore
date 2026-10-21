@@ -1,0 +1,12 @@
+.git
+.github
+target/
+**/node_modules/
+**/.next/
+mcp/dist/
+evidence/
+logs/
+.overnight-logs/
+*.tmp
+*.log
+.env.local
