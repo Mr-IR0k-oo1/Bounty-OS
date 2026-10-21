@@ -8,9 +8,20 @@ export function useWebSocket(jobId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    if (!jobId) return
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:8000/ws`
-    const ws = new WebSocket(`${wsUrl}/jobs/${jobId}`)
+    if (!jobId || typeof window === 'undefined') return
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const hostname = window.location.hostname
+
+    let base = process.env.NEXT_PUBLIC_WS_URL
+    if (!base || base.startsWith('/')) {
+      if (window.location.port === '3000') {
+        base = `${protocol}//${hostname}:8000/api/ws`
+      } else {
+        base = `${protocol}//${window.location.host}/api/ws`
+      }
+    }
+
+    const ws = new WebSocket(`${base}/jobs/${jobId}`)
     wsRef.current = ws
     ws.onopen = () => setConnected(true)
     ws.onmessage = (event) => setLogs((prev) => [...prev, event.data])

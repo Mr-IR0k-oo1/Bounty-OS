@@ -23,7 +23,7 @@ evidence/*
 !evidence/.gitkeep
 
 # Cloned tools & prototypes
-tools/
+/tools/
 vulnllm-client/
 
 # Logs

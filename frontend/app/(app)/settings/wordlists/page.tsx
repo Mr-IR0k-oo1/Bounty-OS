@@ -20,39 +20,84 @@ type Wordlist = {
 const initialWordlists: Wordlist[] = [
   { 
     id: "w1", 
-    name: "subdomains-top1mil.txt", 
-    category: "Subdomain Enumeration", 
-    path: "/opt/wordlists/subdomains.txt", 
-    lines: "1,024,000", 
-    size: "12.4 MB",
-    sample: ["api", "dev", "admin", "auth", "vpn", "staging", "internal", "mail", "corp", "portal", "test", "v1", "v2", "graphql", "gateway"]
+    name: "ffuf-wordlist-5000.txt", 
+    category: "Endpoint Discovery", 
+    path: "/app/wordlists/ffuf-wordlist-5000.txt", 
+    lines: "5,000", 
+    size: "43.3 KB",
+    sample: ["api", "admin", "login", "dashboard", "graphql", "v1", "v2", "auth", "portal", "users", "config", "oauth", "docs"]
   },
   { 
     id: "w2", 
-    name: "resolvers-trusted.txt", 
-    category: "DNS Resolvers", 
-    path: "/opt/wordlists/dns-all.txt", 
-    lines: "2,500,000", 
-    size: "28.1 MB",
-    sample: ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112", "208.67.222.222"]
-  },
-  { 
-    id: "w3", 
-    name: "burp-parameter-names.txt", 
-    category: "Parameters", 
-    path: "/opt/wordlists/params.txt", 
-    lines: "12,500", 
-    size: "156 KB",
+    name: "param-names.txt", 
+    category: "Parameter Discovery", 
+    path: "/app/wordlists/param-names.txt", 
+    lines: "715", 
+    size: "5.5 KB",
     sample: ["id", "user", "username", "token", "redirect_uri", "url", "callback", "action", "cmd", "file", "path", "query", "debug", "admin", "role"]
   },
   { 
+    id: "w3", 
+    name: "ffuf-headers.txt", 
+    category: "Header Injection", 
+    path: "/app/wordlists/ffuf-headers.txt", 
+    lines: "140", 
+    size: "2.1 KB",
+    sample: ["X-Forwarded-For", "X-Real-IP", "X-Originating-IP", "X-Remote-IP", "X-Client-IP", "X-Host", "Host", "X-Forwarded-Host"]
+  },
+  { 
     id: "w4", 
-    name: "seclists-common-passwords.txt", 
-    category: "Passwords & Brute", 
-    path: "/opt/wordlists/passwords.txt", 
-    lines: "500,000", 
-    size: "6.2 MB",
-    sample: ["admin", "password", "123456", "root", "toor", "guest", "operator", "letmein", "welcome", "changeme"]
+    name: "ffuf-cookies.txt", 
+    category: "Cookie Discovery", 
+    path: "/app/wordlists/ffuf-cookies.txt", 
+    lines: "120", 
+    size: "1.9 KB",
+    sample: ["session", "sessionid", "token", "auth_token", "jwt", "remember_me", "user_id", "csrf_token", "phpsessid", "jsessionid"]
+  },
+  { 
+    id: "w5", 
+    name: "ffuf-wordlist-default-long.txt", 
+    category: "Deep Directory Fuzzing", 
+    path: "/app/wordlists/ffuf-wordlist-default-long.txt", 
+    lines: "185,240", 
+    size: "2.3 MB",
+    sample: [".env", ".git/config", "wp-config.php", "server-status", "robots.txt", "swagger.json", "actuator/health", "console"]
+  },
+  { 
+    id: "w6", 
+    name: "ffuf-wordlist-default-small.txt", 
+    category: "Fast Directory Fuzzing", 
+    path: "/app/wordlists/ffuf-wordlist-default-small.txt", 
+    lines: "3,200", 
+    size: "38.9 KB",
+    sample: ["index", "home", "about", "contact", "pricing", "register", "forgot-password", "terms", "privacy", "status"]
+  },
+  { 
+    id: "w7", 
+    name: "api-endpoints.txt", 
+    category: "REST & GraphQL APIs", 
+    path: "/app/wordlists/api-endpoints.txt", 
+    lines: "350", 
+    size: "4.8 KB",
+    sample: ["api/v1", "api/v2", "graphql", "swagger/v1/swagger.json", "openapi.json", "health", "metrics", "actuator"]
+  },
+  { 
+    id: "w8", 
+    name: "sensitive-files.txt", 
+    category: "Sensitive Files & Leaks", 
+    path: "/app/wordlists/sensitive-files.txt", 
+    lines: "85", 
+    size: "1.4 KB",
+    sample: [".env", "id_rsa", "credentials.json", "config.json", ".git/HEAD", "docker-compose.yml", "backup.sql"]
+  },
+  { 
+    id: "w9", 
+    name: "raft-medium-dirs.txt", 
+    category: "Raft Dictionaries", 
+    path: "/app/wordlists/raft-medium-dirs.txt", 
+    lines: "30,000", 
+    size: "280 KB",
+    sample: ["admin", "login", "images", "js", "css", "assets", "static", "uploads", "include", "backup"]
   },
 ]
 

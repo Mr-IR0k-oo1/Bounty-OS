@@ -95,6 +95,8 @@ impl ToolRegistry {
             "naabu",
             "katana",
             "nuclei",
+            "dnsx",
+            "dalfox",
             "gau",
             "waybackurls",
         ];

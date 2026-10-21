@@ -29,6 +29,8 @@ services:
     image: redis:7-alpine
     container_name: bountyos-redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     command: >
       redis-server
       --requirepass "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"
@@ -78,6 +80,8 @@ services:
       - ./scripts:/app/scripts:ro
       - ./config:/app/config:ro
       - ./logs:/app/logs
+      - ./wordlists:/app/wordlists:ro
+      - ./knowledge-base:/app/knowledge-base:ro
     ports:
       # Binds strictly to private interface (127.0.0.1) by default; override in .env for LAN access
       - "${SERVER_BIND_IP:-127.0.0.1}:${SERVER_PORT:-8000}:8000"
@@ -101,6 +105,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-/ws}
+        BACKEND_URL: ${BACKEND_URL:-http://server:8000}
     container_name: bountyos-frontend
     restart: unless-stopped
     depends_on:

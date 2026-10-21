@@ -1,12 +1,9 @@
 "use client";
 
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { NewThemeProvider as ThemeProvider } from "@/components/layout/NewThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/useAuth";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({
   children,
@@ -15,7 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

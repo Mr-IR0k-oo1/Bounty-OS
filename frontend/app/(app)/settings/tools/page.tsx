@@ -14,6 +14,8 @@ const defaultTools = [
   { name: "naabu", path: "/usr/local/bin/naabu", version: "2.3.2", healthy: true },
   { name: "katana", path: "/usr/local/bin/katana", version: "1.1.2", healthy: true },
   { name: "nuclei", path: "/usr/local/bin/nuclei", version: "3.4.0", healthy: true },
+  { name: "dnsx", path: "/usr/local/bin/dnsx", version: "1.2.1", healthy: true },
+  { name: "dalfox", path: "/usr/local/bin/dalfox", version: "3.2.1", healthy: true },
   { name: "gau", path: "/usr/local/bin/gau", version: "2.2.4", healthy: false },
 ]
 
