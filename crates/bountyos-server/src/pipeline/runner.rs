@@ -177,6 +177,8 @@ pub async fn run_managed_tool_job(
                 "-Pn".to_string(),
                 "-silent".to_string(),
                 "-json".to_string(),
+                "-r".to_string(),
+                "127.0.0.11,8.8.8.8".to_string(),
                 "-sr".to_string(),
                 "-no-stdin".to_string(),
                 "-host".to_string(),
@@ -184,6 +186,10 @@ pub async fn run_managed_tool_job(
             ]);
         }
         "gau" => {
+            args.push("--timeout".to_string());
+            args.push("2".to_string());
+            args.push("--retries".to_string());
+            args.push("1".to_string());
             args.push(target.clone());
         }
         "waybackurls" => {
@@ -199,8 +205,8 @@ pub async fn run_managed_tool_job(
         job_id, tool, args
     ));
 
-    // Execute with a 60-second safety timeout
-    let timeout_duration = Duration::from_secs(60);
+    // Execute with a 15-second safety timeout
+    let timeout_duration = Duration::from_secs(15);
     let exec_res = tokio::time::timeout(
         timeout_duration,
         Command::new(&binary_path)
