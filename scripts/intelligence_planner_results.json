@@ -1,0 +1,223 @@
+{
+  "timestamp": "2026-10-22T05:10:54.582Z",
+  "milestone": "Bounty OS v0.2 — Investigation Intelligence Engine",
+  "total_cases": 12,
+  "passed_cases": 12,
+  "failed_cases": 0,
+  "cases": [
+    {
+      "index": 1,
+      "name": "Empty target without subdomains selects subfinder",
+      "status": "PASS",
+      "details": "Latency: 46ms",
+      "action": {
+        "id": "b7bb547e-8184-4899-9baa-9f282226b0fb",
+        "action_type": "subdomain_enumeration",
+        "tool": "subfinder",
+        "target": "target.local",
+        "reason": "Root domain without subdomain coverage",
+        "score": 0.74,
+        "context": {}
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 2,
+      "name": "Subdomains discovered without DNS resolution selects dnsx",
+      "status": "PASS",
+      "details": "Latency: 2ms",
+      "action": {
+        "id": "68e297c3-7279-4e85-8737-fdff9548017f",
+        "action_type": "dns_resolution",
+        "tool": "dnsx",
+        "target": "api.target.local",
+        "reason": "New subdomain 'api.target.local' without DNS resolution",
+        "score": 0.72,
+        "context": {}
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 3,
+      "name": "DNS resolved host without port coverage selects naabu",
+      "status": "PASS",
+      "details": "Latency: 1ms",
+      "action": {
+        "id": "b54388f3-5d38-45d1-aac2-31986fb6e5d6",
+        "action_type": "port_scan",
+        "tool": "naabu",
+        "target": "target.local",
+        "reason": "Resolved host 'target.local' without port coverage",
+        "score": 0.7,
+        "context": {}
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 4,
+      "name": "Discovered port 443 without HTTP metadata selects httpx",
+      "status": "PASS",
+      "details": "Latency: 2ms",
+      "action": {
+        "id": "f521d7ae-e758-4425-ade7-9c0cf7d0618d",
+        "action_type": "http_probe",
+        "tool": "httpx",
+        "target": "target.local:443",
+        "reason": "Discovered service on port 443 without HTTP metadata",
+        "score": 0.68,
+        "context": {
+          "port": "443"
+        }
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 5,
+      "name": "Live application without endpoint coverage selects katana",
+      "status": "PASS",
+      "details": "Latency: 2ms",
+      "action": {
+        "id": "43d25d0e-4278-46c6-9566-9a2c0a8024ec",
+        "action_type": "endpoint_crawl",
+        "tool": "katana",
+        "target": "http://target.local:8888",
+        "reason": "Live web application without endpoint coverage",
+        "score": 0.65,
+        "context": {}
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 6,
+      "name": "Historical URL archive coverage absent selects gau",
+      "status": "PASS",
+      "details": "Latency: 2ms",
+      "action": {
+        "id": "91a27f30-b062-40e5-9d41-15ce0fa2244e",
+        "action_type": "historical_urls",
+        "tool": "gau",
+        "target": "target.local:8888",
+        "reason": "Historical URL archive coverage absent for web service",
+        "score": 0.55,
+        "context": {}
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 7,
+      "name": "Parameterized reflected endpoint prioritizes dalfox over crawling",
+      "status": "PASS",
+      "details": "Score: 0.87",
+      "action": {
+        "id": "eca45782-6b8d-4d89-a6b7-7284caf53b1a",
+        "action_type": "xss_analysis",
+        "tool": "dalfox",
+        "target": "http://target.local:8888/search?q=test",
+        "reason": "Parameterized endpoint with reflected parameter 'q'",
+        "score": 0.87,
+        "context": {
+          "param_name": "q",
+          "param_location": "Query"
+        }
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 8,
+      "name": "Identified technology stack selects targeted nuclei scan",
+      "status": "PASS",
+      "details": "Latency: 1ms",
+      "action": {
+        "id": "ac0a138d-7e0e-4d55-a940-6587e561b8eb",
+        "action_type": "tech_vulnerability_scan",
+        "tool": "nuclei",
+        "target": "target.local",
+        "reason": "Discovered technologies (Apache 2.4.41) with matching vulnerability templates",
+        "score": 0.76,
+        "context": {
+          "technologies": "Apache 2.4.41"
+        }
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 9,
+      "name": "High-confidence finding prioritizes deterministic verification",
+      "status": "PASS",
+      "details": "Score: 1",
+      "action": {
+        "id": "12f53b3b-121a-42af-a98c-76d378db98ef",
+        "action_type": "finding_verification",
+        "tool": "verification",
+        "target": "http://target.local:8888/search?q=test",
+        "reason": "High-confidence finding 'Confirmed Reflected Cross-Site Scripting (XSS)' requiring deterministic verification",
+        "score": 1,
+        "context": {
+          "finding_title": "Confirmed Reflected Cross-Site Scripting (XSS)",
+          "finding_id": "find-xss-123"
+        }
+      },
+      "stop_reason": null
+    },
+    {
+      "index": 10,
+      "name": "No valuable unexplored surface halts scan with explicit STOP",
+      "status": "PASS",
+      "details": "Stop reason: {\"type\":\"NoLegalActions\"}",
+      "action": {
+        "id": "4647fd38-986b-45b6-8ebc-80ffdb2d2159",
+        "action_type": "stop",
+        "tool": "none",
+        "target": "",
+        "reason": "No legal actions remaining within scope and budget",
+        "score": 0,
+        "context": {}
+      },
+      "stop_reason": {
+        "type": "NoLegalActions"
+      }
+    },
+    {
+      "index": 11,
+      "name": "Out-of-scope target strictly rejected from candidate generation",
+      "status": "PASS",
+      "details": "Chosen: none",
+      "action": {
+        "id": "ce7254f1-68ff-4a05-b2c9-b389d860b73a",
+        "action_type": "stop",
+        "tool": "none",
+        "target": "",
+        "reason": "No legal actions remaining within scope and budget",
+        "score": 0,
+        "context": {}
+      },
+      "stop_reason": {
+        "type": "NoLegalActions"
+      }
+    },
+    {
+      "index": 12,
+      "name": "Tool already executed on target is not duplicated",
+      "status": "PASS",
+      "details": "Recommended: none",
+      "action": {
+        "id": "1a33e034-7094-4585-b875-fa4e35211e0f",
+        "action_type": "stop",
+        "tool": "none",
+        "target": "",
+        "reason": "No legal actions remaining within scope and budget",
+        "score": 0,
+        "context": {}
+      },
+      "stop_reason": {
+        "type": "NoLegalActions"
+      }
+    }
+  ],
+  "decision_quality_metrics": {
+    "average_score": 0.74,
+    "average_latency_ms": 5,
+    "explainability_reasons_present": true,
+    "stop_conditions_validated": true
+  }
+}
