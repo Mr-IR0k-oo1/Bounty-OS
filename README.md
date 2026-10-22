@@ -28,40 +28,50 @@
 
 ## 📐 Architecture
 
-```text
-                     Investigation Target
-                               │
-                               ▼
-                    Target Archetype Classifier
-                     (Evidence-based Taxonomy)
-                               │
-                 ┌─────────────┴─────────────┐
-                 ▼                           ▼
-        Local Attack Surface         Global Experience
-               Graph                       Store
-                 │                           │
-                 └─────────────┬─────────────┘
-                               ▼
-                       Candidate Actions
-                               │
-                     Strategic Reasoning
-                        (VulnLLM-R-7B)
-                               │
-                      Experience Scoring
-                 V(a | archetype, tech, state)
-                               │
-                      Scope Authorization
-                               │
-                         Tool Adapter
-            (Naabu / Subfinder / Katana / Nuclei / Dalfox)
-                               │
-                         Real Evidence
-                               │
-                         Action Outcome
-                               │
-                               └─────────────▶ Global Experience
-                                                (Bayesian Update
-                                                + Provenance Audit)
+```mermaid
+flowchart TD
+    subgraph TargetAnalysis["Target Analysis"]
+        T["🎯 Investigation Target<br/>(URL / Scope Definitions)"] --> TAC["Target Archetype Classifier<br/>(Evidence-based Taxonomy)"]
+    end
+
+    subgraph Memory["State & Experience Memory"]
+        TAC -->|"Local Attack State"| ASG[("Attack Surface Graph<br/>Domains, Ports, Endpoints, Vulns")]
+        TAC -->|"Archetype Context"| GES[("Global Experience Store<br/>V(a | archetype, tech)")]
+    end
+
+    subgraph Intelligence["Planning & Strategic Policy"]
+        ASG --> CA["Candidate Action Generator"]
+        GES --> CA
+        CA --> VLLM["Strategic VulnLLM Layer<br/>(Falsifiable Hypotheses)"]
+        VLLM --> HF["Anti-Hallucination<br/>Programmatic Validation Firewall"]
+        HF --> ES["Empirical Experience Scoring<br/>V_new = (n*V_old + V_obs) / (n + 1)"]
+        ES --> EG{"ε-Greedy Strategy<br/>(p=0.15 Explore)"}
+        EG -->|"Exploit (High V)"| SP["Scope & Authorization Gate"]
+        EG -->|"Explore (Uncertainty Bonus)"| SP
+    end
+
+    subgraph Execution["Execution & Verification"]
+        SP -->|"Authorized Dispatch"| TA["Tool Adapter Subprocess<br/>(Naabu / Subfinder / Katana / Nuclei / Dalfox)"]
+        TA --> EV["Cryptographic Evidence Engine<br/>(Raw Artifacts & SHA-256 Hashes)"]
+        EV --> VR["Finding Verification Engine<br/>(Reproducible Proofs)"]
+    end
+
+    subgraph Learning["Bayesian Feedback Loop"]
+        VR --> AO["Measured Action Outcome<br/>(Δ Assets, Δ Endpoints, TTFF, Compute Cost)"]
+        AO -->|"Mutate Attack Graph"| ASG
+        AO -->|"Bayesian Running Average"| GES
+        AO -->|"Audit Record"| PROV[("Experience Provenance<br/>Linked Investigation Trail")]
+    end
+
+    classDef primary fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef memory fill:#0f172a,stroke:#8b5cf6,stroke-width:2px,color:#f8fafc;
+    classDef exec fill:#1e1e2e,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    classDef feedback fill:#1c1917,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    
+    class TAC,CA,VLLM,HF,ES,SP primary;
+    class ASG,GES,PROV memory;
+    class TA,EV,VR exec;
+    class AO feedback;
 ```
 
 ---
@@ -173,17 +183,21 @@ Bounty OS enforces **strict authorization boundaries**:
 
 ## 🗺️ Roadmap
 
-```text
-v0.1  Execution + Security Pipeline            [RELEASED]
-v0.2  Deterministic Intelligence Planner       [RELEASED]
-v0.3  Closed-Loop Autonomous Execution         [RELEASED]
-v0.4  Empirical Action-Value Telemetry         [RELEASED]
-v0.5  Strategic VulnLLM Reasoning Layer        [RELEASED]
-v0.6  Cross-Investigation Experience           [CURRENT]
-v0.7  Target-Specific Investigation Policies   [NEXT]
-v0.8  Human-in-the-Loop Active Feedback
-v0.9  Large-Scale Distributed Benchmark
-v1.0  Production Release
+```mermaid
+flowchart LR
+    v1["v0.1 Execution & Scope"]:::done --> v2["v0.2 Intelligence Engine"]:::done
+    v2 --> v3["v0.3 Autonomous Loop"]:::done
+    v3 --> v4["v0.4 Empirical Telemetry"]:::done
+    v4 --> v5["v0.5 Strategic VulnLLM"]:::done
+    v5 --> v6["v0.6 Global Experience"]:::active
+    v6 --> v7["v0.7 Target Policies"]:::future
+    v7 --> v8["v0.8 Human Feedback"]:::future
+    v8 --> v9["v0.9 Scale Benchmark"]:::future
+    v9 --> v10["v1.0 Production"]:::future
+
+    classDef done fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef active fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#eff6ff;
+    classDef future fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#94a3b8;
 ```
 
 ---
