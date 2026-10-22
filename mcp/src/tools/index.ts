@@ -11,6 +11,7 @@ import { registerFindingTools } from "./findings.js";
 import { registerEvidenceTools } from "./evidence.js";
 import { registerReportTools } from "./reports.js";
 import { registerSystemTools } from "./system.js";
+import { registerIntelligenceTools } from "./intelligence.js";
 import { registerAliases } from "./aliases.js";
 
 export function registerTools(server: McpServer, client: BountyOSClient) {
@@ -18,6 +19,7 @@ export function registerTools(server: McpServer, client: BountyOSClient) {
   registerSystemTools(server, client);
   registerScopeTools(server, client);
   registerInvestigationTools(server, client);
+  registerIntelligenceTools(server, client);
   registerAssetTools(server, client);
   registerServiceTools(server, client);
   registerEndpointTools(server, client);

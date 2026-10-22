@@ -11,6 +11,7 @@ mod config;
 mod db;
 mod errors;
 pub mod handlers;
+pub mod intelligence;
 mod llm;
 mod middleware;
 mod models;

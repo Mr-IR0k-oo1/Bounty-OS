@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-10-22T13:05:14.240Z",
+  "benchmark_version": "v0.6",
+  "trials_per_strategy": 4,
+  "metrics": {
+    "strategy_a_fixed": {
+      "name": "Strategy A: Fixed Deterministic Pipeline",
+      "completed_trials": 4,
+      "ttff_ms": 17209,
+      "confirmed_findings": 0,
+      "unique_endpoints": 2.5,
+      "tool_executions": 5,
+      "unnecessary_executions": 3.5,
+      "false_positives": 0,
+      "verification_rate_pct": 100,
+      "compute_cost": 1.8
+    },
+    "strategy_b_planner": {
+      "name": "Strategy B: Deterministic Intelligence Planner",
+      "completed_trials": 4,
+      "ttff_ms": 7230,
+      "confirmed_findings": 0,
+      "unique_endpoints": 1,
+      "tool_executions": 3,
+      "unnecessary_executions": 0,
+      "false_positives": 0,
+      "verification_rate_pct": 100,
+      "compute_cost": 0.7
+    },
+    "strategy_c_vulnllm": {
+      "name": "Strategy C: Planner + VulnLLM (v0.5)",
+      "completed_trials": 4,
+      "ttff_ms": 6549,
+      "confirmed_findings": 0,
+      "unique_endpoints": 1,
+      "tool_executions": 3,
+      "unnecessary_executions": 0,
+      "false_positives": 0,
+      "verification_rate_pct": 100,
+      "compute_cost": 3.7
+    },
+    "strategy_d_experience": {
+      "name": "Strategy D: Planner + VulnLLM + Global Experience (v0.6)",
+      "completed_trials": 4,
+      "ttff_ms": 6199,
+      "confirmed_findings": 0,
+      "unique_endpoints": 1,
+      "tool_executions": 3,
+      "unnecessary_executions": 0,
+      "false_positives": 0,
+      "verification_rate_pct": 100,
+      "compute_cost": 3.4
+    }
+  },
+  "comparison_d_vs_c": {
+    "ttff_reduction": "-5.3%",
+    "tool_executions_delta": "+0.0%",
+    "unnecessary_executions_delta": "0.0%",
+    "compute_cost_delta": "-8.1%",
+    "is_d_superior": true
+  }
+}

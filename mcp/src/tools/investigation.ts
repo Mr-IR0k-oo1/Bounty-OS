@@ -333,4 +333,199 @@ export function registerInvestigationTools(server: McpServer, client: BountyOSCl
       }
     }
   );
+
+  // 6. investigation.plan
+  server.tool(
+    "investigation.plan",
+    "Query the Investigation Intelligence Engine for explainable decision reasoning, next recommended action, alternative candidates, attack surface coverage gaps, and explicit stop conditions.",
+    {
+      investigation_id: z.string().optional().describe("The UUID of the ongoing investigation (if evaluating an existing program)"),
+      target: z.string().optional().describe("Target host or URL (e.g. target.local:8888)"),
+      state: z.record(z.any()).optional().describe("Explicit InvestigationState snapshot (optional)"),
+    },
+    async ({ investigation_id, target, state }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      const permErr = globalPolicyEngine.checkPermission("investigation.plan");
+      if (permErr) {
+        return mcpErrorResponse(permErr.error.code, permErr.error.message);
+      }
+
+      try {
+        let plan;
+        if (investigation_id) {
+          plan = await client.getInvestigationPlan(investigation_id);
+        } else if (state || target) {
+          plan = await client.planInvestigation({ target, state });
+        } else {
+          return mcpErrorResponse(
+            McpErrorCode.INVALID_ARGUMENT,
+            "Must provide either 'investigation_id', 'target', or 'state' to query plan"
+          );
+        }
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.plan",
+          arguments: { investigation_id, target },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse({
+          recommended_action: plan.recommended_action,
+          alternatives: plan.alternatives || [],
+          coverage_gaps: plan.coverage_gaps || [],
+          stop_reason: plan.stop_reason,
+        });
+      } catch (e: any) {
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.plan",
+          arguments: { investigation_id, target },
+          duration_ms: Date.now() - startTime,
+          result: "FAILED",
+          error: e.message,
+        });
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to generate investigation plan: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 7. investigation.run
+  server.tool(
+    "investigation.run",
+    "Execute an autonomous closed-loop investigation cycle driven deterministically by the Intelligence Planner and policy/scope gates.",
+    {
+      investigation_id: z.string().optional().describe("UUID of an existing investigation to continue"),
+      target: z.string().optional().describe("Root target host or URL (e.g. target.local:8888)"),
+      scope: z
+        .object({
+          domains: z.array(z.string()).optional().default([]),
+          ips: z.array(z.string()).optional().default([]),
+          excluded_hosts: z.array(z.string()).optional().default([]),
+        })
+        .optional()
+        .describe("Scope boundary rules"),
+      profile: z.enum(["passive", "standard", "deep"]).default("standard"),
+      max_cycles: z.number().int().min(1).max(30).default(10).describe("Maximum investigation cycles to run"),
+    },
+    async ({ investigation_id, target, scope, profile, max_cycles }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      const permErr = globalPolicyEngine.checkPermission("investigation.run");
+      if (permErr) {
+        return mcpErrorResponse(permErr.error.code, permErr.error.message);
+      }
+
+      if (target) {
+        const inputErr = globalPolicyEngine.validateInput(target, "target");
+        if (inputErr) {
+          return mcpErrorResponse(inputErr.error.code, inputErr.error.message);
+        }
+      }
+
+      try {
+        const summary = await client.runInvestigation({
+          investigation_id,
+          target,
+          scope,
+          profile,
+          max_cycles,
+        });
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.run",
+          arguments: { investigation_id, target, max_cycles },
+          investigation_id: summary.investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(summary);
+      } catch (e: any) {
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.run",
+          arguments: { investigation_id, target },
+          duration_ms: Date.now() - startTime,
+          result: "FAILED",
+          error: e.message,
+        });
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Autonomous investigation loop failed: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 8. investigation.action_history
+  server.tool(
+    "investigation.action_history",
+    "Query the complete persisted intelligence audit trail and telemetry of all decisions, predicted vs actual information gain, and execution results for an investigation.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      try {
+        const actions = await client.getInvestigationActions(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.action_history",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse({
+          investigation_id,
+          actions_count: actions.length,
+          actions,
+        });
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to retrieve investigation action history: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 9. investigation.stop
+  server.tool(
+    "investigation.stop",
+    "Explicitly stop an active investigation, halt pending scan jobs, and mark the investigation inactive.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation / program"),
+    },
+    async ({ investigation_id }) => {
+      try {
+        const res = await client.stopInvestigation(investigation_id);
+        return mcpSuccessResponse(res);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to stop investigation: ${e.message}`
+        );
+      }
+    }
+  );
 }

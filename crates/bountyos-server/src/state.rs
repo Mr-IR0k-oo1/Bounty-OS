@@ -26,6 +26,11 @@ pub struct AppState {
     in_memory_subdomains: Arc<tokio::sync::RwLock<Vec<crate::models::subdomain::Subdomain>>>,
     in_memory_findings: Arc<tokio::sync::RwLock<Vec<crate::models::finding::Finding>>>,
     in_memory_jobs: Arc<tokio::sync::RwLock<Vec<crate::models::scan_job::ScanJob>>>,
+    in_memory_investigation_actions: Arc<tokio::sync::RwLock<Vec<crate::models::investigation_action::InvestigationAction>>>,
+    in_memory_action_outcomes: Arc<tokio::sync::RwLock<Vec<crate::models::action_outcome::ActionOutcome>>>,
+    in_memory_hypotheses: Arc<tokio::sync::RwLock<Vec<crate::models::hypothesis::SecurityHypothesis>>>,
+    in_memory_experience: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceAction>>>,
+    in_memory_provenance: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceProvenance>>>,
 }
 
 impl AppState {
@@ -45,6 +50,11 @@ impl AppState {
         let in_memory_subdomains = Arc::new(tokio::sync::RwLock::new(Self::default_subdomains()));
         let in_memory_findings = Arc::new(tokio::sync::RwLock::new(Self::default_findings()));
         let in_memory_jobs = Arc::new(tokio::sync::RwLock::new(Self::default_jobs()));
+        let in_memory_investigation_actions = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_action_outcomes = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_hypotheses = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_experience = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_provenance = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         Self {
             db_pool,
             redis_pool,
@@ -60,6 +70,11 @@ impl AppState {
             in_memory_subdomains,
             in_memory_findings,
             in_memory_jobs,
+            in_memory_investigation_actions,
+            in_memory_action_outcomes,
+            in_memory_hypotheses,
+            in_memory_experience,
+            in_memory_provenance,
         }
     }
 
@@ -586,6 +601,36 @@ impl AppState {
         &self,
     ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::scan_job::ScanJob>>> {
         &self.in_memory_jobs
+    }
+
+    pub fn in_memory_investigation_actions(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::investigation_action::InvestigationAction>>> {
+        &self.in_memory_investigation_actions
+    }
+
+    pub fn in_memory_action_outcomes(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::action_outcome::ActionOutcome>>> {
+        &self.in_memory_action_outcomes
+    }
+
+    pub fn in_memory_hypotheses(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::hypothesis::SecurityHypothesis>>> {
+        &self.in_memory_hypotheses
+    }
+
+    pub fn in_memory_experience(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceAction>>> {
+        &self.in_memory_experience
+    }
+
+    pub fn in_memory_provenance(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceProvenance>>> {
+        &self.in_memory_provenance
     }
 
     pub fn db(&self) -> &PgPool {

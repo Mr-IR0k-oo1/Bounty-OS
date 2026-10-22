@@ -499,4 +499,288 @@ export class BountyOSClient {
     const clean = evidencePath.replace(/^\/+/, "");
     return this.request<string>(`/evidence/${clean}`);
   }
+
+  // --- Intelligence Engine Operations ---
+
+  async planInvestigation(payload: {
+    investigation_id?: string;
+    target?: string;
+    scope?: any;
+    profile?: string;
+    state?: any;
+  }): Promise<InvestigationPlan> {
+    return this.request<InvestigationPlan>("/investigations/plan", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getInvestigationPlan(investigationId: string): Promise<InvestigationPlan> {
+    return this.request<InvestigationPlan>(`/investigations/${investigationId}/plan`);
+  }
+
+  async runInvestigation(payload: {
+    investigation_id?: string;
+    target?: string;
+    scope?: any;
+    profile?: string;
+    max_cycles?: number;
+    budget?: any;
+  }): Promise<InvestigationRunSummary> {
+    const url = payload.investigation_id
+      ? `/investigations/${payload.investigation_id}/run`
+      : `/investigations/run`;
+    return this.request<InvestigationRunSummary>(url, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getInvestigationActions(investigationId: string): Promise<InvestigationActionRecord[]> {
+    return this.request<InvestigationActionRecord[]>(`/investigations/${investigationId}/actions`);
+  }
+
+  async getInvestigationOutcomes(investigationId: string): Promise<ActionOutcomeRecord[]> {
+    return this.request<ActionOutcomeRecord[]>(`/investigations/${investigationId}/outcomes`);
+  }
+
+  async getInvestigationHypotheses(investigationId: string): Promise<SecurityHypothesisRecord[]> {
+    return this.request<SecurityHypothesisRecord[]>(`/investigations/${investigationId}/hypotheses`);
+  }
+
+  async getInvestigationContext(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/context`);
+  }
+
+  async submitInvestigationHypotheses(investigationId: string, hypotheses: any[]): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/hypothesize`, {
+      method: "POST",
+      body: JSON.stringify({ hypotheses }),
+    });
+  }
+
+  async prioritizeInvestigation(investigationId: string, hypotheses: any[]): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/prioritize`, {
+      method: "POST",
+      body: JSON.stringify({ hypotheses }),
+    });
+  }
+
+  async createInvestigationHypothesis(investigationId: string, payload: {
+    category: string;
+    target: string;
+    rationale: string;
+    confidence?: number;
+    suggested_actions?: string[];
+    required_evidence?: string[];
+  }): Promise<SecurityHypothesisRecord> {
+    return this.request<SecurityHypothesisRecord>(`/investigations/${investigationId}/hypotheses`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getActionValues(): Promise<ToolHistoricalStats[]> {
+    return this.request<ToolHistoricalStats[]>(`/intelligence/action-values`);
+  }
+
+  async getExperienceActions(): Promise<ExperienceActionRecord[]> {
+    return this.request<ExperienceActionRecord[]>(`/experience/actions`);
+  }
+
+  async getExperienceProvenance(query?: { archetype?: string; tool?: string }): Promise<ExperienceProvenanceRecord[]> {
+    const params = new URLSearchParams();
+    if (query?.archetype) params.set("archetype", query.archetype);
+    if (query?.tool) params.set("tool", query.tool);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return this.request<ExperienceProvenanceRecord[]>(`/experience/provenance${qs}`);
+  }
+
+  async getInvestigationArchetype(investigationId: string): Promise<ArchetypeClassificationRecord> {
+    return this.request<ArchetypeClassificationRecord>(`/investigations/${investigationId}/archetype`);
+  }
+
+  async stopInvestigation(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/stop`, {
+      method: "POST",
+    });
+  }
 }
+
+export interface PlannedAction {
+  id: string;
+  action_type: string;
+  tool: string;
+  target: string;
+  reason: string;
+  score: number;
+  info_gain?: number;
+  relevance?: number;
+  confidence?: number;
+  cost?: number;
+  risk?: number;
+  context?: Record<string, string>;
+}
+
+export interface CoverageGap {
+  gap_type: string;
+  target: string;
+  description: string;
+  priority: number;
+}
+
+export interface InvestigationPlan {
+  recommended_action: PlannedAction | null;
+  alternatives: PlannedAction[];
+  coverage_gaps: CoverageGap[];
+  stop_reason: any | null;
+  strategic_summary?: string | null;
+}
+
+export interface SecurityHypothesisRecord {
+  id: string;
+  investigation_id: string;
+  category: string;
+  target: string;
+  rationale: string;
+  confidence: number;
+  status: "active" | "validated" | "refuted" | "unverified" | "investigating";
+  suggested_actions: string[];
+  required_evidence: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestigationActionRecord {
+  id: string;
+  investigation_id: string;
+  action_type: string;
+  target: string;
+  tool: string;
+  score: number;
+  information_gain: number;
+  relevance: number;
+  confidence: number;
+  cost: number;
+  risk: number;
+  reason: string;
+  status: string;
+  actual_information_gain?: number | null;
+  prediction_error?: number | null;
+  findings_generated: number;
+  new_assets_generated: number;
+  job_id?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface ActionOutcomeRecord {
+  id: string;
+  investigation_id: string;
+  action_id?: string | null;
+  tool: string;
+  target: string;
+  planner_score: number;
+  predicted_information_gain: number;
+  execution_time_ms: number;
+  resource_cost: number;
+  risk_score: number;
+  new_assets: number;
+  new_services: number;
+  new_endpoints: number;
+  new_parameters: number;
+  new_technologies: number;
+  new_findings: number;
+  confirmed_findings: number;
+  false_positives: number;
+  verification_result?: string | null;
+  actual_information_gain: number;
+  actual_value: number;
+  prediction_error: number;
+  created_at: string;
+}
+
+export interface ToolHistoricalStats {
+  tool: string;
+  execution_count: number;
+  success_count: number;
+  avg_actual_value: number;
+  avg_information_gain: number;
+  avg_execution_time_ms: number;
+  total_findings: number;
+  total_confirmed_findings: number;
+  total_new_assets: number;
+  total_new_endpoints: number;
+}
+
+export interface StateSummary {
+  subdomains_count: number;
+  services_count: number;
+  endpoints_count: number;
+  parameters_count: number;
+  technologies_count: number;
+  findings_count: number;
+  executed_actions_count: number;
+}
+
+export interface InvestigationRunSummary {
+  investigation_id: string;
+  target: string;
+  status: string;
+  cycles_executed: number;
+  actions_executed: InvestigationActionRecord[];
+  outcomes?: ActionOutcomeRecord[];
+  hypotheses?: SecurityHypothesisRecord[];
+  stop_reason?: string | null;
+  initial_state_summary: StateSummary;
+  final_state_summary: StateSummary;
+  total_findings: number;
+  total_assets: number;
+  total_endpoints: number;
+  total_information_gain: number;
+  archetype?: ArchetypeClassificationRecord;
+}
+
+export interface ExperienceActionRecord {
+  id: string;
+  archetype: string;
+  technology: string;
+  action_type: string;
+  tool: string;
+  predicted_value: number;
+  actual_value: number;
+  avg_execution_time_ms: number;
+  total_new_assets: number;
+  total_new_endpoints: number;
+  total_new_parameters: number;
+  total_new_findings: number;
+  total_confirmed_findings: number;
+  total_false_positives: number;
+  success_rate: number;
+  sample_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExperienceProvenanceRecord {
+  id: string;
+  experience_id: string;
+  archetype: string;
+  tool: string;
+  action_type: string;
+  investigation_id: string;
+  action_id?: string | null;
+  outcome_id?: string | null;
+  observed_value: number;
+  new_findings: number;
+  confirmed_findings: number;
+  created_at: string;
+}
+
+export interface ArchetypeClassificationRecord {
+  archetype: string;
+  confidence: number;
+  evidence: string[];
+}
+

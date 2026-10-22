@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-10-22T10:53:30.422Z",
+  "target": "http://target.local:8888",
+  "trials_per_strategy": 10,
+  "strategies": {
+    "Strategy A: Fixed Pipeline (v0.1)": {
+      "completed_trials": 10,
+      "mean_duration_ms": 17098,
+      "stddev_duration_ms": 397,
+      "mean_assets_discovered": 2,
+      "mean_confirmed_findings": 0,
+      "mean_ttff_ms": 17098,
+      "mean_executions": 5,
+      "mean_redundant_executions": 3,
+      "mean_coverage_score": 80,
+      "mean_action_value": 1
+    },
+    "Strategy B: Deterministic Planner (v0.2/v0.3)": {
+      "completed_trials": 10,
+      "mean_duration_ms": 7052,
+      "stddev_duration_ms": 4802,
+      "mean_assets_discovered": 3,
+      "mean_confirmed_findings": 0,
+      "mean_ttff_ms": 7052,
+      "mean_executions": 3.1,
+      "mean_redundant_executions": 0.1,
+      "mean_coverage_score": 45,
+      "mean_action_value": 2.05
+    },
+    "Strategy C: Adaptive Empirical Planner (v0.4)": {
+      "completed_trials": 10,
+      "mean_duration_ms": 5579,
+      "stddev_duration_ms": 175,
+      "mean_assets_discovered": 3,
+      "mean_confirmed_findings": 0,
+      "mean_ttff_ms": 5579,
+      "mean_executions": 3,
+      "mean_redundant_executions": 0,
+      "mean_coverage_score": 45,
+      "mean_action_value": 2.12
+    }
+  }
+}

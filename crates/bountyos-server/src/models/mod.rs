@@ -1,6 +1,10 @@
+pub mod action_outcome;
 pub mod audit;
+pub mod experience;
 pub mod finding;
 pub mod hunter;
+pub mod hypothesis;
+pub mod investigation_action;
 pub mod port;
 pub mod program;
 pub mod project;

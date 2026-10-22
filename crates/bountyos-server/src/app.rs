@@ -72,6 +72,76 @@ pub fn create_router(
         .route(
             "/evidence/*path",
             get(crate::handlers::static_files::serve_evidence),
+        )
+        // Intelligence routes
+        .route(
+            "/investigations/plan",
+            post(crate::handlers::intelligence::plan_investigation),
+        )
+        .route(
+            "/investigations/:id/plan",
+            get(crate::handlers::intelligence::get_investigation_plan),
+        )
+        .route(
+            "/investigations/run",
+            post(crate::handlers::intelligence::run_investigation),
+        )
+        .route(
+            "/investigations/:id/run",
+            post(crate::handlers::intelligence::run_investigation_by_id),
+        )
+        .route(
+            "/investigations/:id/actions",
+            get(crate::handlers::intelligence::get_investigation_actions),
+        )
+        .route(
+            "/investigations/:id/outcomes",
+            get(crate::handlers::intelligence::get_investigation_outcomes),
+        )
+        .route(
+            "/investigations/:id/hypotheses",
+            get(crate::handlers::intelligence::get_investigation_hypotheses)
+                .post(crate::handlers::intelligence::create_investigation_hypothesis),
+        )
+        .route(
+            "/investigations/:id/context",
+            get(crate::handlers::intelligence::get_investigation_context),
+        )
+        .route(
+            "/investigations/:id/hypothesize",
+            post(crate::handlers::intelligence::submit_investigation_hypotheses),
+        )
+        .route(
+            "/investigations/:id/prioritize",
+            post(crate::handlers::intelligence::prioritize_investigation_hypotheses),
+        )
+        .route(
+            "/intelligence/action-values",
+            get(crate::handlers::intelligence::get_action_values),
+        )
+        .route(
+            "/investigations/:id/pause",
+            post(crate::handlers::intelligence::pause_investigation),
+        )
+        .route(
+            "/investigations/:id/resume",
+            post(crate::handlers::intelligence::resume_investigation),
+        )
+        .route(
+            "/investigations/:id/archetype",
+            get(crate::handlers::intelligence::get_investigation_archetype),
+        )
+        .route(
+            "/experience/actions",
+            get(crate::handlers::intelligence::get_experience_actions),
+        )
+        .route(
+            "/experience/provenance",
+            get(crate::handlers::intelligence::get_experience_provenance),
+        )
+        .route(
+            "/investigations/:id/stop",
+            post(crate::handlers::intelligence::stop_investigation),
         );
 
     // Protected routes (require valid JWT access token)

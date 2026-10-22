@@ -1,0 +1,527 @@
+//! Intelligence Engine HTTP Handlers
+//!
+//! Exposes API endpoints for planning next investigation steps and auditing planner reasoning.
+
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::intelligence::planner::{IntelligencePlanner, InvestigationPlan};
+use crate::intelligence::runner::{
+    list_investigation_actions, AutonomousInvestigationRunner, InvestigationRunSummary,
+    RunInvestigationRequest,
+};
+use crate::intelligence::state::{
+    DiscoveredTechnology, InvestigationProfile, InvestigationState, ScopeBoundary, StateFinding,
+};
+use crate::models::investigation_action::InvestigationAction;
+use crate::state::AppState;
+
+#[derive(Debug, Deserialize)]
+pub struct PlanPayload {
+    pub investigation_id: Option<Uuid>,
+    pub target: Option<String>,
+    pub scope: Option<ScopeBoundary>,
+    pub profile: Option<InvestigationProfile>,
+    pub state: Option<InvestigationState>,
+}
+
+/// Handler for POST /api/investigations/run
+pub async fn run_investigation(
+    State(app_state): State<AppState>,
+    Json(payload): Json<RunInvestigationRequest>,
+) -> Result<Json<InvestigationRunSummary>, (StatusCode, Json<serde_json::Value>)> {
+    let summary = AutonomousInvestigationRunner::run(&app_state, payload).await?;
+    Ok(Json(summary))
+}
+
+/// Handler for POST /api/investigations/:id/run
+pub async fn run_investigation_by_id(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(mut payload): Json<RunInvestigationRequest>,
+) -> Result<Json<InvestigationRunSummary>, (StatusCode, Json<serde_json::Value>)> {
+    payload.investigation_id = Some(id);
+    let summary = AutonomousInvestigationRunner::run(&app_state, payload).await?;
+    Ok(Json(summary))
+}
+
+/// Handler for GET /api/investigations/:id/actions
+pub async fn get_investigation_actions(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<InvestigationAction>>, (StatusCode, Json<serde_json::Value>)> {
+    let actions = list_investigation_actions(&app_state, id).await;
+    Ok(Json(actions))
+}
+
+/// Handler for GET /api/investigations/:id/outcomes
+pub async fn get_investigation_outcomes(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::models::action_outcome::ActionOutcome>>, (StatusCode, Json<serde_json::Value>)> {
+    let outcomes = crate::intelligence::telemetry::list_action_outcomes(&app_state, id).await;
+    Ok(Json(outcomes))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateHypothesisRequest {
+    pub category: String,
+    pub target: String,
+    pub rationale: String,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub suggested_actions: Vec<String>,
+    #[serde(default)]
+    pub required_evidence: Vec<String>,
+}
+
+/// Handler for GET /api/investigations/:id/hypotheses (v0.5)
+pub async fn get_investigation_hypotheses(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::models::hypothesis::SecurityHypothesis>>, (StatusCode, Json<serde_json::Value>)> {
+    let hypotheses = crate::intelligence::llm::hypothesis::list_hypotheses(&app_state, id).await;
+    Ok(Json(hypotheses))
+}
+
+/// Handler for POST /api/investigations/:id/hypotheses (v0.5)
+pub async fn create_investigation_hypothesis(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CreateHypothesisRequest>,
+) -> Result<Json<crate::models::hypothesis::SecurityHypothesis>, (StatusCode, Json<serde_json::Value>)> {
+    let conf = payload.confidence.unwrap_or(0.70).clamp(0.0, 1.0);
+    let hypothesis = crate::models::hypothesis::SecurityHypothesis::new(
+        id,
+        payload.category,
+        payload.target,
+        payload.rationale,
+        conf,
+        payload.suggested_actions,
+        payload.required_evidence,
+    );
+    crate::intelligence::llm::hypothesis::save_hypothesis(&app_state, &hypothesis).await;
+    Ok(Json(hypothesis))
+}
+
+/// Handler for GET /api/investigations/:id/context (v0.5)
+pub async fn get_investigation_context(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::llm::context::StrategicContext>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let outcomes = crate::intelligence::telemetry::list_action_outcomes(&app_state, id).await;
+    let historical_stats = crate::intelligence::telemetry::get_historical_tool_stats(&app_state).await;
+
+    let ctx = crate::intelligence::llm::context::StrategicContext::build(
+        id,
+        &state,
+        &outcomes,
+        &historical_stats,
+    );
+    Ok(Json(ctx))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SubmitHypothesesPayload {
+    pub hypotheses: Vec<CreateHypothesisRequest>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubmitHypothesesResponse {
+    pub accepted_count: usize,
+    pub rejected_count: usize,
+    pub accepted_hypotheses: Vec<crate::models::hypothesis::SecurityHypothesis>,
+    pub rejected_reasons: Vec<String>,
+}
+
+/// Handler for POST /api/investigations/:id/hypothesize (v0.5)
+pub async fn submit_investigation_hypotheses(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<SubmitHypothesesPayload>,
+) -> Result<Json<SubmitHypothesesResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let mut accepted = Vec::new();
+    let mut rejected_reasons = Vec::new();
+
+    for req in payload.hypotheses {
+        let conf = req.confidence.unwrap_or(0.70);
+        let hyp = crate::models::hypothesis::SecurityHypothesis::new(
+            id,
+            req.category,
+            req.target,
+            req.rationale,
+            conf,
+            req.suggested_actions,
+            req.required_evidence,
+        );
+
+        match crate::intelligence::llm::validation::LlmOutputValidator::validate_hypothesis(&hyp, id, &state) {
+            Ok(()) => {
+                crate::intelligence::llm::hypothesis::save_hypothesis(&app_state, &hyp).await;
+                accepted.push(hyp);
+            }
+            Err(e) => {
+                rejected_reasons.push(e.to_string());
+            }
+        }
+    }
+
+    Ok(Json(SubmitHypothesesResponse {
+        accepted_count: accepted.len(),
+        rejected_count: rejected_reasons.len(),
+        accepted_hypotheses: accepted,
+        rejected_reasons,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PrioritizePayload {
+    pub hypotheses: Vec<crate::intelligence::llm::prioritization::RankedHypothesisInput>,
+}
+
+/// Handler for POST /api/investigations/:id/prioritize (v0.5)
+pub async fn prioritize_investigation_hypotheses(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<PrioritizePayload>,
+) -> Result<Json<crate::intelligence::llm::prioritization::StrategicPrioritization>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+
+    for item in &payload.hypotheses {
+        if !state.is_in_scope(&item.target) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": format!("REJECTED: Target '{}' is out of scope", item.target)
+                })),
+            ));
+        }
+    }
+
+    let prio = crate::intelligence::llm::prioritization::StrategicPrioritizer::prioritize_ranked_items(&payload.hypotheses);
+    Ok(Json(prio))
+}
+
+/// Handler for GET /api/intelligence/action-values
+pub async fn get_action_values(
+    State(app_state): State<AppState>,
+) -> Result<Json<std::collections::HashMap<String, crate::intelligence::action_value::HistoricalToolStats>>, (StatusCode, Json<serde_json::Value>)> {
+    let stats = crate::intelligence::telemetry::get_historical_tool_stats(&app_state).await;
+    Ok(Json(stats))
+}
+
+/// Handler for POST /api/investigations/:id/pause
+pub async fn pause_investigation(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let mut lock = app_state.in_memory_jobs().write().await;
+    let mut paused_count = 0;
+    for job in lock.iter_mut().filter(|j| j.program_id == id && j.status == "running") {
+        job.status = "paused".to_string();
+        job.updated_at = chrono::Utc::now();
+        paused_count += 1;
+    }
+    Ok(Json(json!({
+        "investigation_id": id,
+        "status": "paused",
+        "jobs_paused": paused_count,
+        "message": format!("Investigation paused. {} running jobs paused.", paused_count)
+    })))
+}
+
+/// Handler for POST /api/investigations/:id/resume
+pub async fn resume_investigation(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let mut lock = app_state.in_memory_jobs().write().await;
+    let mut resumed_count = 0;
+    for job in lock.iter_mut().filter(|j| j.program_id == id && j.status == "paused") {
+        job.status = "running".to_string();
+        job.updated_at = chrono::Utc::now();
+        resumed_count += 1;
+    }
+    Ok(Json(json!({
+        "investigation_id": id,
+        "status": "running",
+        "jobs_resumed": resumed_count,
+        "message": format!("Investigation resumed. {} jobs resumed.", resumed_count)
+    })))
+}
+
+/// Handler for POST /api/investigations/:id/stop
+pub async fn stop_investigation(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    {
+        let mut lock = app_state.in_memory_programs().write().await;
+        if let Some(p) = lock.iter_mut().find(|p| p.id == id) {
+            p.active = false;
+        }
+    }
+    let mut lock = app_state.in_memory_jobs().write().await;
+    let mut cancelled_count = 0;
+    for job in lock.iter_mut().filter(|j| j.program_id == id && (j.status == "running" || j.status == "queued")) {
+        job.status = "cancelled".to_string();
+        job.completed_at = Some(chrono::Utc::now());
+        job.updated_at = chrono::Utc::now();
+        cancelled_count += 1;
+    }
+    Ok(Json(json!({
+        "investigation_id": id,
+        "status": "stopped",
+        "jobs_cancelled": cancelled_count,
+        "message": "Investigation stopped and active jobs cancelled."
+    })))
+}
+
+/// Handler for POST /api/investigations/plan
+pub async fn plan_investigation(
+    State(app_state): State<AppState>,
+    Json(payload): Json<PlanPayload>,
+) -> Result<Json<InvestigationPlan>, (StatusCode, Json<serde_json::Value>)> {
+    // 1. If explicit state is provided, plan directly
+    if let Some(state) = payload.state {
+        let plan = IntelligencePlanner::plan(&state);
+        return Ok(Json(plan));
+    }
+
+    // 2. If investigation_id is provided, reconstruct state from database / in-memory store
+    if let Some(inv_id) = payload.investigation_id {
+        let state = build_state_from_investigation(&app_state, inv_id).await?;
+        let plan = IntelligencePlanner::plan(&state);
+        return Ok(Json(plan));
+    }
+
+    // 3. If target is provided, create a fresh investigation state
+    if let Some(target) = payload.target {
+        let scope = payload.scope.unwrap_or_else(|| {
+            let mut s = ScopeBoundary::new();
+            s.domains.push(target.clone());
+            s
+        });
+        let profile = payload.profile.unwrap_or_default();
+        let state = InvestigationState::new(target, scope, profile);
+        let plan = IntelligencePlanner::plan(&state);
+        return Ok(Json(plan));
+    }
+
+    Err((
+        StatusCode::BAD_REQUEST,
+        Json(json!({
+            "error": "Must provide either 'state', 'investigation_id', or 'target' in request body"
+        })),
+    ))
+}
+
+/// Handler for GET /api/investigations/:id/plan
+pub async fn get_investigation_plan(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<InvestigationPlan>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = IntelligencePlanner::plan(&state);
+    Ok(Json(plan))
+}
+
+/// Reconstruct typed InvestigationState from live server storage
+async fn build_state_from_investigation(
+    app_state: &AppState,
+    investigation_id: Uuid,
+) -> Result<InvestigationState, (StatusCode, Json<serde_json::Value>)> {
+    // 1. Locate program (Database or in-memory)
+    let program = if app_state.has_db() {
+        sqlx::query_as::<_, crate::models::program::Program>(
+            "SELECT * FROM programs WHERE id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_optional(app_state.db())
+        .await
+        .ok()
+        .flatten()
+    } else {
+        None
+    };
+
+    let program = match program {
+        Some(p) => p,
+        None => {
+            let lock = app_state.in_memory_programs().read().await;
+            match lock.iter().find(|p| p.id == investigation_id).cloned() {
+                Some(p) => p,
+                None => {
+                    return Err((
+                        StatusCode::NOT_FOUND,
+                        Json(json!({"error": format!("Investigation '{}' not found", investigation_id)})),
+                    ));
+                }
+            }
+        }
+    };
+
+    let target = program.program_url.clone().unwrap_or_else(|| program.name.clone());
+
+    // 2. Load scope targets
+    let mut scope = ScopeBoundary::new();
+    if app_state.has_db() {
+        if let Ok(targets) = sqlx::query_as::<_, crate::models::scope::ScopeTarget>(
+            "SELECT * FROM scope_targets WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for s in targets {
+                if s.out_of_scope {
+                    scope.excluded_hosts.push(s.target);
+                } else if s.target.starts_with("*.") {
+                    scope.wildcards.push(s.target);
+                } else {
+                    scope.domains.push(s.target);
+                }
+            }
+        }
+    }
+
+    if scope.domains.is_empty() && scope.wildcards.is_empty() {
+        let lock = app_state.in_memory_scope().read().await;
+        for s in lock.iter().filter(|s| s.program_id == investigation_id) {
+            if s.out_of_scope {
+                scope.excluded_hosts.push(s.target.clone());
+            } else if s.target.starts_with("*.") {
+                scope.wildcards.push(s.target.clone());
+            } else {
+                scope.domains.push(s.target.clone());
+            }
+        }
+    }
+
+    if scope.domains.is_empty() && scope.wildcards.is_empty() {
+        scope.domains.push(target.clone());
+    }
+
+    let mut state = InvestigationState::new(target, scope, InvestigationProfile::Standard);
+
+    // 3. Load subdomains
+    {
+        let lock = app_state.in_memory_subdomains().read().await;
+        for sub in lock.iter().filter(|s| s.program_id == investigation_id) {
+            state.add_subdomain(&sub.subdomain, &sub.source);
+            if let Some(ref ip) = sub.ip_address {
+                state.mark_subdomain_dns_resolved(&sub.subdomain, vec![ip.clone()], vec![]);
+            }
+            if let Some(ref ws) = sub.web_server {
+                state.add_technology(DiscoveredTechnology {
+                    name: ws.clone(),
+                    version: None,
+                    cpe: None,
+                    category: Some("Web Server".to_string()),
+                    templates_matched: vec![],
+                });
+            }
+            for t in &sub.tech {
+                state.add_technology(DiscoveredTechnology {
+                    name: t.clone(),
+                    version: None,
+                    cpe: None,
+                    category: None,
+                    templates_matched: vec![],
+                });
+            }
+        }
+    }
+
+    // 4. Load findings
+    {
+        let lock = app_state.in_memory_findings().read().await;
+        for f in lock.iter().filter(|f| f.program_id == investigation_id) {
+            let sev = match f.severity.to_lowercase().as_str() {
+                "critical" => crate::intelligence::state::FindingSeverity::Critical,
+                "high" => crate::intelligence::state::FindingSeverity::High,
+                "medium" => crate::intelligence::state::FindingSeverity::Medium,
+                "low" => crate::intelligence::state::FindingSeverity::Low,
+                _ => crate::intelligence::state::FindingSeverity::Info,
+            };
+            let verified = f.status.eq_ignore_ascii_case("verified") || f.status.eq_ignore_ascii_case("confirmed");
+            let conf = if verified {
+                crate::intelligence::state::FindingConfidence::Confirmed
+            } else {
+                crate::intelligence::state::FindingConfidence::Firm
+            };
+
+            let endpoint = f.matched_at.clone().unwrap_or_else(|| f.title.clone());
+            let mut sf = StateFinding::new(&f.title, sev, conf, endpoint);
+            sf.id = f.id.to_string();
+            sf.verified = verified;
+            state.add_finding(sf);
+        }
+    }
+
+    // 5. Load executed jobs
+    {
+        let lock = app_state.in_memory_jobs().read().await;
+        for j in lock.iter().filter(|j| j.program_id == investigation_id) {
+            let tool = j
+                .flags
+                .as_ref()
+                .and_then(|fl| fl.get("tool"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("unknown");
+            let target_str = j.target.as_deref().unwrap_or("");
+            if j.status == "completed" || j.status == "done" {
+                state.record_executed_action("scan", tool, target_str, 1000, true, None);
+            }
+        }
+    }
+
+    Ok(state)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProvenanceQuery {
+    pub archetype: Option<String>,
+    pub tool: Option<String>,
+}
+
+/// Handler for GET /api/experience/actions (v0.6)
+pub async fn get_experience_actions(
+    State(app_state): State<AppState>,
+) -> Result<Json<Vec<crate::models::experience::ExperienceAction>>, (StatusCode, Json<serde_json::Value>)> {
+    let actions = crate::intelligence::experience::GlobalExperienceStore::list_experience(&app_state).await;
+    Ok(Json(actions))
+}
+
+/// Handler for GET /api/experience/provenance (v0.6)
+pub async fn get_experience_provenance(
+    State(app_state): State<AppState>,
+    Query(query): Query<ProvenanceQuery>,
+) -> Result<Json<Vec<crate::models::experience::ExperienceProvenanceRecord>>, (StatusCode, Json<serde_json::Value>)> {
+    let audit = crate::intelligence::experience::GlobalExperienceStore::get_provenance_audit(
+        &app_state,
+        query.archetype.as_deref(),
+        query.tool.as_deref(),
+    ).await;
+    Ok(Json(audit))
+}
+
+/// Handler for GET /api/investigations/:id/archetype (v0.6)
+pub async fn get_investigation_archetype(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::archetype::ArchetypeClassification>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let classification = crate::intelligence::archetype::TargetArchetypeClassifier::classify(&state);
+    Ok(Json(classification))
+}
+

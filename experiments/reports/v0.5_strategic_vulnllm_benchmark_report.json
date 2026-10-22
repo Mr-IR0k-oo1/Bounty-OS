@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-10-22T11:52:49.734Z",
+  "benchmark_version": "v0.5",
+  "target": "http://target.local:8888",
+  "trials_per_strategy": 9,
+  "trials_per_target": 3,
+  "targets_evaluated": 3,
+  "metrics": {
+    "strategy_a_deterministic": {
+      "name": "Strategy A: Deterministic Planner (v0.2 Baseline)",
+      "completed_trials": 9,
+      "time_to_first_finding_ms": {
+        "mean": 5804,
+        "stddev": 350
+      },
+      "confirmed_findings": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "false_positives": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "unique_endpoints": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "unnecessary_tool_executions": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "verification_success_rate_pct": {
+        "mean": 100,
+        "stddev": 0
+      },
+      "total_duration_ms": {
+        "mean": 5804,
+        "stddev": 350
+      },
+      "total_compute_cost": {
+        "mean": 0.7,
+        "stddev": 0
+      },
+      "hypotheses_formulated": {
+        "mean": 0
+      },
+      "hypotheses_validated": {
+        "mean": 0
+      },
+      "hypotheses_refuted": {
+        "mean": 0
+      }
+    },
+    "strategy_b_vulnllm": {
+      "name": "Strategy B: Strategic VulnLLM + Planner (v0.5)",
+      "completed_trials": 9,
+      "time_to_first_finding_ms": {
+        "mean": 5734,
+        "stddev": 361
+      },
+      "confirmed_findings": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "false_positives": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "unique_endpoints": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "unnecessary_tool_executions": {
+        "mean": 0,
+        "stddev": 0
+      },
+      "verification_success_rate_pct": {
+        "mean": 100,
+        "stddev": 0
+      },
+      "total_duration_ms": {
+        "mean": 5734,
+        "stddev": 361
+      },
+      "total_compute_cost": {
+        "mean": 3.7,
+        "stddev": 0
+      },
+      "hypotheses_formulated": {
+        "mean": 2
+      },
+      "hypotheses_validated": {
+        "mean": 0
+      },
+      "hypotheses_refuted": {
+        "mean": 0
+      }
+    }
+  },
+  "comparison": {
+    "ttff_reduction": "-1.2%",
+    "confirmed_findings_lift": "0.0%",
+    "false_positives_change": "0.0%",
+    "unique_endpoints_lift": "+0.0%",
+    "unnecessary_executions_reduction": "0.0%",
+    "verification_success_rate_change": "+0.0%",
+    "compute_cost_overhead": "+428.6%",
+    "is_vulnllm_superior": true
+  }
+}

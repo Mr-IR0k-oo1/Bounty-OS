@@ -2,6 +2,7 @@
 
 pub mod findings;
 pub mod hunters;
+pub mod intelligence;
 pub mod jobs;
 pub mod ports;
 pub mod programs;

@@ -36,8 +36,12 @@ export const TOOL_CAPABILITY_MAP: Record<string, CapabilityLevel> = {
   // Investigation tools
   "investigation.start": CapabilityLevel.LOW_IMPACT,
   "investigation.status": CapabilityLevel.PASSIVE,
+  "investigation.plan": CapabilityLevel.PASSIVE,
+  "investigation.run": CapabilityLevel.ACTIVE,
+  "investigation.action_history": CapabilityLevel.PASSIVE,
   "investigation.pause": CapabilityLevel.LOW_IMPACT,
   "investigation.resume": CapabilityLevel.LOW_IMPACT,
+  "investigation.stop": CapabilityLevel.LOW_IMPACT,
   "investigation.cancel": CapabilityLevel.LOW_IMPACT,
   "list_programs": CapabilityLevel.PASSIVE,
   "get_program_details": CapabilityLevel.PASSIVE,
