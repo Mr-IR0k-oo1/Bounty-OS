@@ -1,6 +1,7 @@
 {
   "name": "bountyos-mcp",
-  "version": "1.0.0",
+  "version": "0.6.0",
+  "license": "Apache-2.0",
   "type": "module",
   "description": "Model Context Protocol (MCP) server for BountyOS - connects AI agents to bug bounty programs, scope, recon assets, and findings",
   "main": "dist/index.js",

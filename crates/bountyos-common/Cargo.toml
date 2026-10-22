@@ -1,7 +1,10 @@
 [package]
 name = "bountyos-common"
-version = "0.1.0"
+version = "0.6.0"
 edition = "2021"
+license = "Apache-2.0"
+description = "Common data structures and types for Bounty OS"
+repository = "https://github.com/Mr-IR0k-oo1/Bounty-OS"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

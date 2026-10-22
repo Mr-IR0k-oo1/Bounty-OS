@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "bountyos-analyzer"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "bountyos-cli"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bountyos-common",
@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "bountyos-common"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -323,7 +323,7 @@ dependencies = [
 
 [[package]]
 name = "bountyos-server"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "argon2",
