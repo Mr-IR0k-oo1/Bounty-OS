@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 
 import { AdaptivePlannerPanel } from "./AdaptivePlannerPanel"
+import { AttackSurfaceGraphPanel } from "./AttackSurfaceGraphPanel"
 
 interface IntelligenceLearningTabProps {
   programId: string
@@ -124,7 +125,10 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
 
   return (
     <div className="space-y-6">
-      {/* 0. Adaptive Investigation Planner */}
+      {/* 0. Attack Surface Graph v0.2 */}
+      <AttackSurfaceGraphPanel programId={programId} programName={programName} />
+
+      {/* 1. Adaptive Investigation Planner */}
       <AdaptivePlannerPanel programId={programId} programName={programName} />
 
       {/* 1. Target Profile Banner */}
