@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   AlertTriangle, ChevronDown, Activity, CheckCircle2, XCircle, Clock, 
   Play, Globe, Server, Shield, Bug, ExternalLink, Edit3, X, Terminal, 
-  Layers, Link2, Image as ImageIcon, FileText, AlertCircle, RefreshCw 
+  Layers, Link2, Image as ImageIcon, FileText, AlertCircle, RefreshCw, Cpu 
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/useToast"
@@ -25,6 +25,7 @@ import { ScreenshotGrid } from "@/components/recon/ScreenshotGrid"
 import { LiveLog } from "@/components/recon/LiveLog"
 import { FindingsTable } from "@/components/findings/FindingsTable"
 import { ReportBuilder } from "@/components/reports/ReportBuilder"
+import { IntelligenceLearningTab } from "@/components/programs/IntelligenceLearningTab"
 import { useAuth } from "@/hooks/useAuth"
 import type { 
   Program, ScopeTarget, ScopeType, Subdomain, Port, 
@@ -57,6 +58,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         recon: 2,
         findings: 3,
         reports: 4,
+        intelligence: 5,
       }
       if (tabParam && tabMap[tabParam] !== undefined) {
         setActiveTab(tabMap[tabParam])
@@ -456,7 +458,8 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
           { label: `Scope (${targets.length})`, icon: Shield },
           { label: `Recon Assets (${subdomains.length})`, icon: Globe },
           { label: `Findings (${findings.length})`, icon: Bug },
-          { label: "Report Generator", icon: FileText }
+          { label: "Report Generator", icon: FileText },
+          { label: "Intelligence & Learning", icon: Cpu }
         ].map((tab, i) => {
           const Icon = tab.icon
           const isActive = activeTab === i
@@ -466,7 +469,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
               onClick={() => {
                 setActiveTab(i)
                 if (typeof window !== "undefined") {
-                  const tabKeys = ["overview", "scope", "recon", "findings", "reports"]
+                  const tabKeys = ["overview", "scope", "recon", "findings", "reports", "intelligence"]
                   const url = new URL(window.location.href)
                   url.searchParams.set("tab", tabKeys[i])
                   window.history.replaceState(null, "", url.toString())
@@ -716,6 +719,11 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         <div className="card p-6">
           <ReportBuilder findings={findings} />
         </div>
+      )}
+
+      {/* Tab 5: Intelligence & Learning */}
+      {activeTab === 5 && (
+        <IntelligenceLearningTab programId={program.id} programName={program.name} />
       )}
 
       {/* Live Log Viewer Modal */}

@@ -14,12 +14,23 @@ import { registerSystemTools } from "./system.js";
 import { registerIntelligenceTools } from "./intelligence.js";
 import { registerAliases } from "./aliases.js";
 
+import { registerEducationTools } from "./education.js";
+import { registerThreatTools } from "./threat.js";
+import { registerBehaviorTools } from "./behavior.js";
+import { registerRepeaterTools } from "./repeater.js";
+import { registerAuthTools } from "./auth.js";
+
 export function registerTools(server: McpServer, client: BountyOSClient) {
   // Primary High-Level Control Plane Tools
   registerSystemTools(server, client);
   registerScopeTools(server, client);
   registerInvestigationTools(server, client);
   registerIntelligenceTools(server, client);
+  registerEducationTools(server, client);
+  registerThreatTools(server, client);
+  registerBehaviorTools(server, client);
+  registerRepeaterTools(server, client);
+  registerAuthTools(server, client);
   registerAssetTools(server, client);
   registerServiceTools(server, client);
   registerEndpointTools(server, client);

@@ -151,6 +151,30 @@ pub fn create_router(
             "/investigations/:id/stop",
             post(crate::handlers::intelligence::stop_investigation),
         )
+        .route(
+            "/investigations/:id/education",
+            get(crate::handlers::intelligence::get_investigation_education),
+        )
+        .route(
+            "/investigations/:id/threats",
+            get(crate::handlers::intelligence::get_investigation_threats),
+        )
+        .route(
+            "/investigations/:id/prioritization",
+            get(crate::handlers::intelligence::get_investigation_prioritization),
+        )
+        .route(
+            "/investigations/:id/behavior",
+            post(crate::handlers::intelligence::analyze_investigation_behavior),
+        )
+        .route(
+            "/investigations/:id/flows/replay",
+            post(crate::handlers::intelligence::replay_investigation_flow),
+        )
+        .route(
+            "/investigations/:id/authz/test",
+            post(crate::handlers::intelligence::test_investigation_authz),
+        )
         );
 
     // Protected routes (require valid JWT access token)

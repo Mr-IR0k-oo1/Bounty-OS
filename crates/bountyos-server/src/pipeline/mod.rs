@@ -1,3 +1,4 @@
+pub mod adapters;
 pub mod parsers;
 pub mod queue;
 pub mod runner;

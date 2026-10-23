@@ -39,6 +39,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "017_target_profiles",
         include_str!("migrations/017_target_profiles.sql"),
     ),
+    (
+        "018_ars0n_capabilities",
+        include_str!("migrations/018_ars0n_capabilities.sql"),
+    ),
 ];
 
 pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {

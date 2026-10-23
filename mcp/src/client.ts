@@ -614,6 +614,48 @@ export class BountyOSClient {
     });
   }
 
+  async getInvestigationEducation(investigationId: string): Promise<EducationLessonRecord> {
+    return this.request<EducationLessonRecord>(`/investigations/${investigationId}/education`);
+  }
+
+  async getInvestigationThreats(investigationId: string): Promise<ThreatItemRecord[]> {
+    return this.request<ThreatItemRecord[]>(`/investigations/${investigationId}/threats`);
+  }
+
+  async getInvestigationPrioritization(investigationId: string): Promise<TargetPrioritizationScoreRecord> {
+    return this.request<TargetPrioritizationScoreRecord>(`/investigations/${investigationId}/prioritization`);
+  }
+
+  async analyzeInvestigationBehavior(investigationId: string, targetUrl: string): Promise<BehaviorReportRecord> {
+    return this.request<BehaviorReportRecord>(`/investigations/${investigationId}/behavior`, {
+      method: "POST",
+      body: JSON.stringify({ target_url: targetUrl }),
+    });
+  }
+
+  async replayInvestigationFlow(investigationId: string, flow: any, dryRun: boolean = false): Promise<FlowReplayResultRecord> {
+    return this.request<FlowReplayResultRecord>(`/investigations/${investigationId}/flows/replay`, {
+      method: "POST",
+      body: JSON.stringify({ flow, dry_run: dryRun }),
+    });
+  }
+
+  async testInvestigationAuthz(
+    investigationId: string,
+    endpointTemplate: string,
+    resourceIdA: string,
+    identityB: any
+  ): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/authz/test`, {
+      method: "POST",
+      body: JSON.stringify({
+        endpoint_template: endpointTemplate,
+        resource_id_a: resourceIdA,
+        identity_b: identityB,
+      }),
+    });
+  }
+
 }
 
 export interface PlannedAction {
@@ -825,4 +867,60 @@ export interface TargetPolicyRecord {
   recommended_action: PlannedAction | null;
   alternatives: PlannedAction[];
 }
+
+export interface EducationLessonRecord {
+  stage: string;
+  current_surface_summary: string;
+  recommended_action: string;
+  reason: string;
+  evidence_requirements: string;
+  learning_objective: string;
+}
+
+export interface ThreatItemRecord {
+  asset: string;
+  stride: "Spoofing" | "Tampering" | "Repudiation" | "InformationDisclosure" | "DenialOfService" | "ElevationOfPrivilege";
+  title: string;
+  description: string;
+  status: "Observed" | "Inferred" | "Hypothesized" | "Verified";
+  evidence: string[];
+  mitigation?: string;
+}
+
+export interface TargetPrioritizationScoreRecord {
+  target: string;
+  base_score: number;
+  endpoint_density_score: number;
+  parameter_richness_score: number;
+  technology_multiplier: number;
+  auth_boundary_bonus: number;
+  historical_experience_factor: number;
+  total_priority_score: number;
+  explanations: string[];
+}
+
+export interface BehaviorReportRecord {
+  target_url: string;
+  baseline_status: number;
+  baseline_latency_ms: number;
+  baseline_length: number;
+  waf_vendor?: string | null;
+  rate_limit_detected: boolean;
+  active_blocking_detected: boolean;
+  observations: string[];
+}
+
+export interface FlowReplayResultRecord {
+  flow_id: string;
+  effective_url: string;
+  effective_method: string;
+  effective_headers: Record<string, string>;
+  effective_body?: string | null;
+  status_code?: number | null;
+  response_body_snippet?: string | null;
+  response_headers: Record<string, string>;
+  duration_ms: number;
+  dry_run: boolean;
+}
+
 

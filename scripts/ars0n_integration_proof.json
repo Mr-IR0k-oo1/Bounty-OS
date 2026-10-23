@@ -1,0 +1,86 @@
+{
+  "suite": "Ars0n Framework Capability Integration Suite",
+  "timestamp": "2026-10-23T06:04:54.670Z",
+  "passed_assertions": 13,
+  "failed_assertions": 0,
+  "assertions": [
+    {
+      "title": "Server Health Check",
+      "status": "PASS",
+      "detail": "Status: 200 OK (\"OK\")",
+      "timestamp": "2026-10-23T06:04:54.679Z"
+    },
+    {
+      "title": "Admin Authentication",
+      "status": "PASS",
+      "detail": "JWT Access Token issued successfully",
+      "timestamp": "2026-10-23T06:04:54.704Z"
+    },
+    {
+      "title": "Investigation Registration",
+      "status": "PASS",
+      "detail": "Investigation ID: 9bc2db48-8f74-4bd2-86c4-f1e30c75a45f",
+      "timestamp": "2026-10-23T06:04:54.715Z"
+    },
+    {
+      "title": "Scope Target Enrolled",
+      "status": "PASS",
+      "detail": "Allowed host: lab-target:8888",
+      "timestamp": "2026-10-23T06:04:54.722Z"
+    },
+    {
+      "title": "Target Profile Evaluation",
+      "status": "PASS",
+      "detail": "Archetype: unknown, Confidence: 25%",
+      "timestamp": "2026-10-23T06:04:54.727Z"
+    },
+    {
+      "title": "Help Me Learn Education Layer",
+      "status": "PASS",
+      "detail": "Stage: Passive Reconnaissance & OSINT | Objective: Mastering zero-touch passive reconnaissance and certificate transparency intelligence.",
+      "timestamp": "2026-10-23T06:04:54.730Z"
+    },
+    {
+      "title": "STRIDE Threat Modeling",
+      "status": "PASS",
+      "detail": "Synthesized 1 threats. First: [InformationDisclosure] Initial Attack Surface Baseline (Status: Hypothesized)",
+      "timestamp": "2026-10-23T06:04:54.732Z"
+    },
+    {
+      "title": "Target Prioritization & ROI",
+      "status": "PASS",
+      "detail": "Total Score: 17 | Explanations: 3 factors",
+      "timestamp": "2026-10-23T06:04:54.735Z"
+    },
+    {
+      "title": "Observable Behavior Analysis",
+      "status": "PASS",
+      "detail": "Baseline HTTP Status: 200, Latency: 9ms, WAF: \"None\"",
+      "timestamp": "2026-10-23T06:04:54.766Z"
+    },
+    {
+      "title": "Request Flow Dry-Run Simulation",
+      "status": "PASS",
+      "detail": "Mutated headers verified: {\"X-Mutated\":\"True\",\"X-Probe\":\"1\"}",
+      "timestamp": "2026-10-23T06:04:54.780Z"
+    },
+    {
+      "title": "Request Flow Live Scoped Replay",
+      "status": "PASS",
+      "detail": "Received HTTP 200 in 9ms",
+      "timestamp": "2026-10-23T06:04:54.803Z"
+    },
+    {
+      "title": "Evidence-Driven Comparative Authorization",
+      "status": "PASS",
+      "detail": "Executed without unhandled fault. Result: {\"investigation_id\":\"9bc2db48-8f74-4bd2-86c4-f1e30c75a45f\",\"vulnerability_candidate\":{\"data\":{\"confidence\":\"firm\",\"evidence\":\"HTTP Status: 200 OK under foreign identity 'User B' (Role: user). Response excerpt: {\\n  \\\"app_name\\\": \\\"LabPortal\\\",\\n  \\\"version\\\": \\\"1.2.0-beta\\\",\\n  \\\"environment\\\": \\\"staging-internal\\\",\\n  \\\"debug\\\": true,\\n  \\\"api_keys\\\": [\\n    \\\"key_live_lab_98374298174\\\"\\n  ]\\n}\",\"parameter\":\"resource_id\",\"payload\":\"admin\",\"severity\":\"high\",\"target\":\"http://lab-target:8888/api/v1/config\",\"title\":\"BOLA / IDOR: Identity 'User B' accessed resource 'admin'\",\"vuln_class\":\"Broken Object Level Authorization (BOLA/IDOR)\"},\"type\":\"VulnerabilityCandidate\"}}",
+      "timestamp": "2026-10-23T06:04:54.836Z"
+    },
+    {
+      "title": "Scope Gate Rejection of Out-of-Scope Target",
+      "status": "PASS",
+      "detail": "Correctly blocked: Behavior analysis target 'http://unauthorized-evil-target.com' is out of scope",
+      "timestamp": "2026-10-23T06:04:54.848Z"
+    }
+  ]
+}
