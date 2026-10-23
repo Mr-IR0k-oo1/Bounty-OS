@@ -528,4 +528,121 @@ export function registerInvestigationTools(server: McpServer, client: BountyOSCl
       }
     }
   );
+
+  // 10. investigation.next_action
+  server.tool(
+    "investigation.next_action",
+    "Query the adaptive investigation planner for the highest-value, safe, non-redundant next security action.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      const permErr = globalPolicyEngine.checkPermission("investigation.next_action");
+      if (permErr) {
+        return mcpErrorResponse(permErr.error.code, permErr.error.message);
+      }
+
+      try {
+        const action = await client.getNextAction(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.next_action",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(action);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to determine next investigation action: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 11. investigation.explain_decision
+  server.tool(
+    "investigation.explain_decision",
+    "Provide a detailed, explainable breakdown of the planner's scoring components, reasons, alternatives, and rejected candidate actions.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      const permErr = globalPolicyEngine.checkPermission("investigation.explain_decision");
+      if (permErr) {
+        return mcpErrorResponse(permErr.error.code, permErr.error.message);
+      }
+
+      try {
+        const explanation = await client.explainDecision(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.explain_decision",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(explanation);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to explain planner decision: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 12. investigation.replan
+  server.tool(
+    "investigation.replan",
+    "Trigger immediate re-evaluation of candidate security actions given newly discovered attack surface observations.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      const permErr = globalPolicyEngine.checkPermission("investigation.replan");
+      if (permErr) {
+        return mcpErrorResponse(permErr.error.code, permErr.error.message);
+      }
+
+      try {
+        const plan = await client.replanInvestigation(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.replan",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(plan);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to replan investigation: ${e.message}`
+        );
+      }
+    }
+  );
 }

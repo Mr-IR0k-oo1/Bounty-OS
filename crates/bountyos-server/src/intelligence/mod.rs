@@ -5,6 +5,7 @@
 
 pub mod action_value;
 pub mod actions;
+pub mod adaptive_planner;
 pub mod archetype;
 pub mod authz;
 pub mod behavior;
@@ -30,6 +31,10 @@ pub mod uncertainty;
 
 pub use action_value::{ActionValueModel, HistoricalToolStats, ValueWeights};
 pub use actions::{ActionType, PlannedAction};
+pub use adaptive_planner::{
+    AdaptivePlan, AdaptivePlanner, AdaptiveScorer, PlannerActionDef, PlannerCapability,
+    PlannerScoreComponents, PreconditionEngine, RedundancyEngine, RejectedCandidate,
+};
 pub use authz::{AuthzEngine, Identity, AuthorizationBoundary};
 pub use behavior::{BehaviorAnalyzer, BehaviorReport, WafVendor};
 pub use education::{EducationEngine, EducationLesson};

@@ -177,4 +177,9 @@ export const api = {
       max_concurrent_jobs: number
       evidence_base_path: string
     }>('/settings'),
+  getAdaptivePlan: (programId: string) => request<any>(`/investigations/${programId}/adaptive-plan`),
+  getNextAction: (programId: string) => request<any>(`/investigations/${programId}/next-action`),
+  explainDecision: (programId: string) => request<any>(`/investigations/${programId}/explain-decision`),
+  replanInvestigation: (programId: string) => request<any>(`/investigations/${programId}/replan`, { method: 'POST' }),
 }
+

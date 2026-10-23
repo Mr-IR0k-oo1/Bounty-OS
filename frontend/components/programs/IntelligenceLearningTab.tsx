@@ -9,6 +9,7 @@ import {
   AlertTriangle, RefreshCw, Server, Globe, Lock, Code2, Zap, Send
 } from "lucide-react"
 
+import { AdaptivePlannerPanel } from "./AdaptivePlannerPanel"
 
 interface IntelligenceLearningTabProps {
   programId: string
@@ -123,6 +124,9 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
 
   return (
     <div className="space-y-6">
+      {/* 0. Adaptive Investigation Planner */}
+      <AdaptivePlannerPanel programId={programId} programName={programName} />
+
       {/* 1. Target Profile Banner */}
       <div className="card p-5 bg-card/60 backdrop-blur border-border/80">
         <div className="flex flex-wrap items-center justify-between gap-4">

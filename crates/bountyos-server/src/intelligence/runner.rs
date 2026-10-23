@@ -414,6 +414,37 @@ impl AutonomousInvestigationRunner {
                 &archetype_classification,
             ).await;
 
+            // Adaptive Planner: Record fine-grained ActionExecution with before/after state deltas
+            let execution_record = crate::models::planner_decision::ActionExecution {
+                id: Uuid::new_v4(),
+                investigation_id,
+                decision_id: None,
+                action_type: action.action_type.as_str().to_string(),
+                capability: action.action_type.as_str().to_string(),
+                tool: action.tool.clone(),
+                target: action.target.clone(),
+                status: if is_success { "completed".to_string() } else { "failed".to_string() },
+                assets_before: pre_snapshot.subdomains_count as i32 + pre_snapshot.hosts_count as i32,
+                assets_after: state.subdomains.len() as i32 + state.hosts.len() as i32,
+                endpoints_before: pre_snapshot.endpoints_count as i32,
+                endpoints_after: state.endpoints.len() as i32,
+                parameters_before: pre_snapshot.parameters_count as i32,
+                parameters_after: state.endpoints.iter().map(|e| e.params.len()).sum::<usize>() as i32,
+                findings_before: pre_snapshot.findings_count as i32,
+                findings_after: state.findings.len() as i32,
+                verified_findings_before: pre_snapshot.verified_findings_count as i32,
+                verified_findings_after: state.findings.iter().filter(|f| f.verified).count() as i32,
+                new_technologies: outcome.new_technologies,
+                new_services: outcome.new_services,
+                execution_duration_ms: duration_ms as i64,
+                exit_status: Some(_exit_code),
+                error_type: if is_success { None } else { Some("tool_execution_failed".to_string()) },
+                information_gain: outcome.actual_information_gain,
+                created_at: Utc::now(),
+                completed_at: Some(Utc::now()),
+            };
+            crate::models::planner_decision::save_action_execution(app_state, &execution_record).await;
+
             // k. Update action record telemetry
             let actual_ig = metrics.actual_information_gain;
             let pred_error = (action.info_gain - actual_ig).abs();
