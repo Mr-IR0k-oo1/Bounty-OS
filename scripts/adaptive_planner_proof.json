@@ -1,6 +1,6 @@
 {
   "test_suite": "Bounty OS Adaptive Investigation Planner",
-  "timestamp": "2026-10-23T11:49:49.779Z",
+  "timestamp": "2026-10-23T11:55:41.361Z",
   "passed": 23,
   "failed": 0,
   "tests": [
@@ -8,139 +8,139 @@
       "title": "Backend server connectivity",
       "pass": true,
       "detail": "HTTP 200",
-      "timestamp": "2026-10-23T11:49:49.795Z"
+      "timestamp": "2026-10-23T11:55:41.371Z"
     },
     {
       "title": "Admin authentication & JWT acquisition",
       "pass": true,
       "detail": "Access token granted",
-      "timestamp": "2026-10-23T11:49:49.973Z"
+      "timestamp": "2026-10-23T11:55:41.391Z"
     },
     {
       "title": "Investigation initialized with scope tracking",
       "pass": true,
-      "detail": "ID: 41ae9eb0-7ac1-4e6f-8827-9781d495d602",
-      "timestamp": "2026-10-23T11:49:49.985Z"
+      "detail": "ID: f49358c0-bd77-46f4-948b-dc53ff9ebb15",
+      "timestamp": "2026-10-23T11:55:41.400Z"
     },
     {
       "title": "Scope target enrolled",
       "pass": true,
       "detail": "Host: lab-target:8888",
-      "timestamp": "2026-10-23T11:49:49.990Z"
+      "timestamp": "2026-10-23T11:55:41.403Z"
     },
     {
       "title": "Initial plan evaluation responds HTTP 200",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T11:49:50.000Z"
+      "timestamp": "2026-10-23T11:55:41.408Z"
     },
     {
       "title": "Initial state generates candidate action",
       "pass": true,
       "detail": "Action #1: crawl_application",
-      "timestamp": "2026-10-23T11:49:50.000Z"
+      "timestamp": "2026-10-23T11:55:41.408Z"
     },
     {
       "title": "XSS analysis rejected in initial state (0 parameters)",
       "pass": true,
       "detail": "Reason: \"No endpoints with input parameters found for XSS analysis\"",
-      "timestamp": "2026-10-23T11:49:50.000Z"
+      "timestamp": "2026-10-23T11:55:41.408Z"
     },
     {
       "title": "SQLi analysis rejected in initial state (0 parameters)",
       "pass": true,
       "detail": "Reason: \"No parameterized endpoints found for SQL injection testing\"",
-      "timestamp": "2026-10-23T11:49:50.000Z"
+      "timestamp": "2026-10-23T11:55:41.408Z"
     },
     {
       "title": "Planner recalculates when new attack-surface observations appear",
       "pass": true,
       "detail": "Action #2: investigate_s_q_li",
-      "timestamp": "2026-10-23T11:49:50.020Z"
+      "timestamp": "2026-10-23T11:55:41.418Z"
     },
     {
       "title": "State metrics updated dynamically",
       "pass": true,
       "detail": "Endpoints: 1, Parameters: 2",
-      "timestamp": "2026-10-23T11:49:50.020Z"
+      "timestamp": "2026-10-23T11:55:41.418Z"
     },
     {
       "title": "GET /api/investigations/:id/explain-decision responds HTTP 200",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Decision persisted in planner_decisions table",
       "pass": true,
-      "detail": "Decision ID: 0c11f6d9-e337-4779-955d-351ccd903d1f",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "detail": "Decision ID: a8d3d578-e0bb-4a89-a144-51c574c2f348",
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Decision stores exact capability and score",
       "pass": true,
       "detail": "Capability: investigate_sqli, Score: 79",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Decision stores explainable score components",
       "pass": true,
       "detail": "Components: {\"advisory_llm_bonus\":0,\"evidence_completeness\":14,\"execution_cost\":4,\"finding_potential\":34,\"information_gain\":18,\"redundancy_penalty\":0,\"risk_penalty\":3,\"target_relevance\":20}",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Decision stores technical reasoning",
       "pass": true,
       "detail": "Reason: \"Parameterized endpoint with query parameters eligible for SQL injection audit\"",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Decision stores ranked alternatives",
       "pass": true,
       "detail": "Alternatives count: 5",
-      "timestamp": "2026-10-23T11:49:50.026Z"
+      "timestamp": "2026-10-23T11:55:41.424Z"
     },
     {
       "title": "Redundancy and penalty engine active on re-run",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T11:49:50.041Z"
+      "timestamp": "2026-10-23T11:55:41.437Z"
     },
     {
       "title": "Redundancy penalty computed deterministically",
       "pass": true,
       "detail": "Penalty: 0",
-      "timestamp": "2026-10-23T11:49:50.041Z"
+      "timestamp": "2026-10-23T11:55:41.437Z"
     },
     {
       "title": "VulnLLM advisory bonus is strictly bounded (max +10)",
       "pass": true,
       "detail": "Observed bonus: +0",
-      "timestamp": "2026-10-23T11:49:50.047Z"
+      "timestamp": "2026-10-23T11:55:41.441Z"
     },
     {
       "title": "Selected capability is strictly constrained to typed domain model",
       "pass": true,
       "detail": "Selected: investigate_x_s_s",
-      "timestamp": "2026-10-23T11:49:50.047Z"
+      "timestamp": "2026-10-23T11:55:41.441Z"
     },
     {
       "title": "Planner rejects arbitrary or unallowlisted actions",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T11:49:50.047Z"
+      "timestamp": "2026-10-23T11:55:41.441Z"
     },
     {
       "title": "Planner rejects nonexistent / unauthorized investigation IDs",
       "pass": true,
       "detail": "Status: 404",
-      "timestamp": "2026-10-23T11:49:50.049Z"
+      "timestamp": "2026-10-23T11:55:41.442Z"
     },
     {
       "title": "Planner selected target respects enrolled program scope",
       "pass": true,
       "detail": "Selected target: \"http://lab-target:8888/search?q=test&category=sec\"",
-      "timestamp": "2026-10-23T11:49:50.060Z"
+      "timestamp": "2026-10-23T11:55:41.447Z"
     }
   ]
 }

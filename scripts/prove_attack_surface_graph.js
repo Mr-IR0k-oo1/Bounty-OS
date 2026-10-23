@@ -115,17 +115,34 @@ async function runSuite() {
     process.exit(1);
   }
 
-  // Step 2: Investigation Target Selection
+  // Step 2: Investigation Target Selection & Setup
   let investigationId = null;
   try {
-    const programsRes = await request('GET', '/api/programs');
-    if (programsRes.status === 200 && Array.isArray(programsRes.data) && programsRes.data.length > 0) {
-      investigationId = programsRes.data[0].id;
-      logAssert("Target investigation resolution", true, `ID: ${investigationId} (${programsRes.data[0].name})`);
-    } else {
-      logAssert("Target investigation resolution", false, "No investigation programs found");
-      process.exit(1);
-    }
+    const projRes = await request('POST', '/api/projects', {
+      name: `Attack Surface Project ${Date.now()}`,
+      description: "Automated test project for Attack Surface Graph v0.2"
+    });
+    const projectId = projRes.data?.id;
+
+    const progRes = await request('POST', `/api/projects/${projectId}/programs`, {
+      name: `Attack Surface Investigation ${Date.now()}`,
+      slug: `asg-lab-${Date.now()}`,
+      platform: "other",
+      program_url: "http://target.local:8888",
+      active_approved: true,
+      rescan_interval_hrs: 24,
+    });
+    investigationId = progRes.data?.id;
+
+    // Add scope target
+    await request('POST', `/api/programs/${investigationId}/scope`, {
+      target: "target.local",
+      target_type: "domain",
+      in_scope: true,
+      attack_vector: "web"
+    });
+
+    logAssert("Target investigation resolution", !!investigationId, `ID: ${investigationId}`);
   } catch (e) {
     logAssert("Target investigation resolution", false, e.message);
     process.exit(1);

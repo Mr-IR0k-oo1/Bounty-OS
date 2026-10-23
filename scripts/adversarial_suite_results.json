@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-23T11:50:24.624Z",
+  "timestamp": "2026-10-23T11:56:06.819Z",
   "total": 19,
   "passed": 19,
   "failed": 0,
@@ -9,133 +9,133 @@
       "name": "Acquire JWT",
       "status": "PASS",
       "details": "Operator token active",
-      "timestamp": "2026-10-23T11:50:20.499Z"
+      "timestamp": "2026-10-23T11:56:03.317Z"
     },
     {
       "phase": "Scope",
       "name": "API: Reject Unlisted Target",
       "status": "PASS",
       "details": "HTTP 422",
-      "timestamp": "2026-10-23T11:50:20.534Z"
+      "timestamp": "2026-10-23T11:56:03.349Z"
     },
     {
       "phase": "Scope",
       "name": "API: Reject Explicit OOS Target",
       "status": "PASS",
       "details": "HTTP 422",
-      "timestamp": "2026-10-23T11:50:20.538Z"
+      "timestamp": "2026-10-23T11:56:03.353Z"
     },
     {
       "phase": "Scope",
       "name": "API: Reject Cloud Metadata IP",
       "status": "PASS",
       "details": "HTTP 422",
-      "timestamp": "2026-10-23T11:50:20.542Z"
+      "timestamp": "2026-10-23T11:56:03.357Z"
     },
     {
       "phase": "Injection",
       "name": "Reject Shell Metacharacters (9 vectors)",
       "status": "PASS",
       "details": "9/9 rejected",
-      "timestamp": "2026-10-23T11:50:20.564Z"
+      "timestamp": "2026-10-23T11:56:03.379Z"
     },
     {
       "phase": "Traversal",
       "name": "Evidence Path Traversal Block (5 vectors)",
       "status": "PASS",
       "details": "5/5 blocked",
-      "timestamp": "2026-10-23T11:50:20.571Z"
+      "timestamp": "2026-10-23T11:56:03.385Z"
     },
     {
       "phase": "Isolation",
       "name": "Cross-Program Findings Leakage",
       "status": "PASS",
       "details": "Program B cannot see Program A finding",
-      "timestamp": "2026-10-23T11:50:20.579Z"
+      "timestamp": "2026-10-23T11:56:03.391Z"
     },
     {
       "phase": "Isolation",
       "name": "Finding Identity Provenance",
       "status": "PASS",
-      "details": "Locked to program e0ba8947-100b-4ece-8ddc-6dabd20eb745",
-      "timestamp": "2026-10-23T11:50:20.583Z"
+      "details": "Locked to program 7635132e-b6be-4f25-af4b-19436006cbd2",
+      "timestamp": "2026-10-23T11:56:03.395Z"
     },
     {
       "phase": "Auth",
       "name": "Reject Empty Authorization Header",
       "status": "PASS",
       "details": "HTTP 401",
-      "timestamp": "2026-10-23T11:50:20.584Z"
+      "timestamp": "2026-10-23T11:56:03.396Z"
     },
     {
       "phase": "Auth",
       "name": "Reject Malformed / Forged JWT",
       "status": "PASS",
       "details": "HTTP 401",
-      "timestamp": "2026-10-23T11:50:20.586Z"
+      "timestamp": "2026-10-23T11:56:03.397Z"
     },
     {
       "phase": "Auth",
       "name": "Reject Invalid Signature Token",
       "status": "PASS",
       "details": "HTTP 401",
-      "timestamp": "2026-10-23T11:50:20.587Z"
+      "timestamp": "2026-10-23T11:56:03.398Z"
     },
     {
       "phase": "Whitelist",
       "name": "Reject Unwhitelisted Binaries (8 vectors)",
       "status": "PASS",
       "details": "8/8 rejected",
-      "timestamp": "2026-10-23T11:50:20.604Z"
+      "timestamp": "2026-10-23T11:56:03.417Z"
     },
     {
       "phase": "LLM Defense",
       "name": "Evidence Prompt Injection Resilience",
       "status": "PASS",
       "details": "Retained severity: critical",
-      "timestamp": "2026-10-23T11:50:20.612Z"
+      "timestamp": "2026-10-23T11:56:03.423Z"
     },
     {
       "phase": "Verifier",
       "name": "Deterministic Verification Without Evidence",
       "status": "PASS",
       "details": "Rejected unevidenced confirmation (POLICY_DENIED)",
-      "timestamp": "2026-10-23T11:50:20.616Z"
+      "timestamp": "2026-10-23T11:56:03.426Z"
     },
     {
       "phase": "Resilience",
       "name": "Offline VulnLLM Graceful Fallback",
       "status": "PASS",
       "details": "HTTP 501",
-      "timestamp": "2026-10-23T11:50:20.618Z"
+      "timestamp": "2026-10-23T11:56:03.429Z"
     },
     {
       "phase": "Resilience",
       "name": "Non-Zero Exit Code Job Completion",
       "status": "PASS",
       "details": "Job status: done",
-      "timestamp": "2026-10-23T11:50:21.249Z"
+      "timestamp": "2026-10-23T11:56:04.050Z"
     },
     {
       "phase": "Resilience",
       "name": "No Orphaned Running Jobs",
       "status": "PASS",
       "details": "0 stuck jobs",
-      "timestamp": "2026-10-23T11:50:21.253Z"
+      "timestamp": "2026-10-23T11:56:04.053Z"
     },
     {
       "phase": "Concurrency",
       "name": "Enqueue 4 Parallel Jobs",
       "status": "PASS",
       "details": "4/4 jobs created",
-      "timestamp": "2026-10-23T11:50:21.288Z"
+      "timestamp": "2026-10-23T11:56:04.314Z"
     },
     {
       "phase": "Concurrency",
       "name": "Parallel Jobs Finished Without Deadlock",
       "status": "PASS",
-      "details": "Completed in 3370ms",
-      "timestamp": "2026-10-23T11:50:24.623Z"
+      "details": "Completed in 2765ms",
+      "timestamp": "2026-10-23T11:56:06.818Z"
     }
   ]
 }
