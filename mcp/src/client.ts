@@ -668,6 +668,29 @@ export class BountyOSClient {
     return this.request<any>(`/investigations/${investigationId}/explain-decision`);
   }
 
+  async getAttackSurfaceGraph(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/graph`);
+  }
+
+  async getAttackSurfaceSummary(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/graph/summary`);
+  }
+
+  async getAttackSurfaceUnexplored(investigationId: string): Promise<any[]> {
+    return this.request<any[]>(`/investigations/${investigationId}/graph/unexplored`);
+  }
+
+  async getAttackSurfaceRelationships(investigationId: string): Promise<any[]> {
+    return this.request<any[]>(`/investigations/${investigationId}/graph/relationships`);
+  }
+
+  async recordAttackSurfaceRelationship(investigationId: string, rel: any): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/graph/relationships`, {
+      method: "POST",
+      body: JSON.stringify(rel),
+    });
+  }
+
   async replanInvestigation(investigationId: string): Promise<any> {
     return this.request<any>(`/investigations/${investigationId}/replan`, {
       method: "POST",

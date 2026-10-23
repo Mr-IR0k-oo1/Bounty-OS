@@ -19,6 +19,7 @@ import { registerThreatTools } from "./threat.js";
 import { registerBehaviorTools } from "./behavior.js";
 import { registerRepeaterTools } from "./repeater.js";
 import { registerAuthTools } from "./auth.js";
+import { registerAttackSurfaceTools } from "./attack_surface.js";
 
 export function registerTools(server: McpServer, client: BountyOSClient) {
   // Primary High-Level Control Plane Tools
@@ -26,6 +27,7 @@ export function registerTools(server: McpServer, client: BountyOSClient) {
   registerScopeTools(server, client);
   registerInvestigationTools(server, client);
   registerIntelligenceTools(server, client);
+  registerAttackSurfaceTools(server, client);
   registerEducationTools(server, client);
   registerThreatTools(server, client);
   registerBehaviorTools(server, client);
