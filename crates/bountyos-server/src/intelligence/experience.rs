@@ -436,7 +436,7 @@ impl GlobalExperienceStore {
 
                 // Epsilon-greedy exploration safeguard:
                 // An action should never be permanently deleted; an epsilon exploration roll can un-prune it
-                let roll = (val * 100.0) % 1.0; // deterministic pseudo-roll based on value
+                let roll = ((val * 9973.0) + (n as f64 * 37.0)).abs().fract();
                 if (roll < exploration_epsilon || exploration_epsilon >= 0.8) && is_pruned {
                     is_pruned = false;
                     is_exploration = true;

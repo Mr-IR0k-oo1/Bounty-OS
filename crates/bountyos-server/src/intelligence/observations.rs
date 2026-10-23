@@ -4,7 +4,6 @@
 //! Ingests observations into InvestigationState and AttackSurfaceGraph, computing
 //! actual information gain ($IG_{actual}$) and prediction error.
 
-use crate::intelligence::actions::ActionType;
 use crate::intelligence::state::{
     DiscoveredEndpoint, DiscoveredParam, DiscoveredTechnology, FindingConfidence, FindingSeverity,
     InvestigationState, ParamLocation, StateFinding,
@@ -75,6 +74,44 @@ pub enum Observation {
     },
     FindingVerified {
         finding_id: String,
+        evidence: String,
+    },
+    SecretCandidateDiscovered {
+        target: String,
+        secret_type: String,
+        redacted_value: String,
+        raw_hash: String,
+        file_path: String,
+        line: Option<usize>,
+        verified: bool,
+    },
+    JavascriptEndpointDiscovered {
+        source_url: String,
+        extracted_endpoint: String,
+        method: Option<String>,
+    },
+    ApiEndpointDiscovered {
+        url: String,
+        path: String,
+        method: String,
+        version: Option<String>,
+        auth_required: bool,
+        is_doc: bool,
+    },
+    GraphqlDiscovered {
+        endpoint: String,
+        engine: Option<String>,
+        introspection_enabled: bool,
+        operations: Vec<String>,
+    },
+    VulnerabilityCandidate {
+        vuln_class: String,
+        title: String,
+        severity: FindingSeverity,
+        confidence: FindingConfidence,
+        target: String,
+        parameter: Option<String>,
+        payload: Option<String>,
         evidence: String,
     },
 }
@@ -450,14 +487,95 @@ impl ObservationIngestion {
                     sf.id = id.clone();
                     sf.matched_at = matched_at.clone();
                     sf.evidence = evidence.clone();
-                    state.add_finding(sf);
-                    new_findings += 1;
+                    if state.add_finding(sf) {
+                        new_findings += 1;
+                    }
                 }
                 Observation::FindingVerified { finding_id, evidence } => {
                     if state.mark_finding_verified(finding_id) {
                         if let Some(f) = state.findings.iter_mut().find(|f| &f.id == finding_id) {
                             f.evidence.push(evidence.clone());
                         }
+                        new_findings += 1;
+                    }
+                }
+                Observation::SecretCandidateDiscovered { target, secret_type, redacted_value, file_path, verified, .. } => {
+                    let title = format!("Exposed Secret: {} in {}", secret_type, file_path);
+                    let severity = if *verified { FindingSeverity::High } else { FindingSeverity::Medium };
+                    let confidence = if *verified { FindingConfidence::Firm } else { FindingConfidence::Tentative };
+                    let mut sf = StateFinding::new(title, severity, confidence, target);
+                    sf.evidence.push(format!("Secret type: {}, Redacted: {}, Path: {}, Verified: {}", secret_type, redacted_value, file_path, verified));
+                    sf.verified = *verified;
+                    if state.add_finding(sf) {
+                        new_findings += 1;
+                    }
+                }
+                Observation::JavascriptEndpointDiscovered { source_url, extracted_endpoint, method } => {
+                    if let Some((url, host, port, path, _)) = Self::parse_endpoint_url(extracted_endpoint) {
+                        let mut ep = DiscoveredEndpoint::new(url, host, port, path);
+                        ep.method = method.clone().unwrap_or_else(|| "GET".to_string());
+                        ep.technologies.push("JavaScript Extract".to_string());
+                        if state.add_endpoint(ep) {
+                            new_assets += 1;
+                        }
+                    } else {
+                        let mut ep = DiscoveredEndpoint::new(extracted_endpoint, source_url, 80, extracted_endpoint);
+                        ep.method = method.clone().unwrap_or_else(|| "GET".to_string());
+                        if state.add_endpoint(ep) {
+                            new_assets += 1;
+                        }
+                    }
+                }
+                Observation::ApiEndpointDiscovered { url, path, method, .. } => {
+                    if let Some((parsed_url, host, port, parsed_path, _)) = Self::parse_endpoint_url(url) {
+                        let mut ep = DiscoveredEndpoint::new(parsed_url, host, port, parsed_path);
+                        ep.method = method.clone();
+                        ep.content_type = Some("application/json".to_string());
+                        if state.add_endpoint(ep) {
+                            new_assets += 1;
+                        }
+                    } else {
+                        let mut ep = DiscoveredEndpoint::new(url, "api", 443, path);
+                        ep.method = method.clone();
+                        ep.content_type = Some("application/json".to_string());
+                        if state.add_endpoint(ep) {
+                            new_assets += 1;
+                        }
+                    }
+                }
+                Observation::GraphqlDiscovered { endpoint, engine, introspection_enabled, operations } => {
+                    if let Some((url, host, port, path, _)) = Self::parse_endpoint_url(endpoint) {
+                        let mut ep = DiscoveredEndpoint::new(url, host, port, path);
+                        ep.content_type = Some("application/json".to_string());
+                        if let Some(eng) = engine {
+                            ep.technologies.push(format!("GraphQL Engine: {}", eng));
+                        }
+                        if *introspection_enabled {
+                            ep.technologies.push("GraphQL Introspection Enabled".to_string());
+                        }
+                        if state.add_endpoint(ep) {
+                            new_assets += 1;
+                        }
+                    }
+                    if *introspection_enabled {
+                        let mut sf = StateFinding::new("GraphQL Schema Introspection Enabled", FindingSeverity::Medium, FindingConfidence::Firm, endpoint);
+                        sf.evidence.push(format!("Operations: {:?}", operations));
+                        if state.add_finding(sf) {
+                            new_findings += 1;
+                        }
+                    }
+                }
+                Observation::VulnerabilityCandidate { title, severity, confidence, target, parameter, payload, evidence, .. } => {
+                    let mut sf = StateFinding::new(title, *severity, *confidence, target);
+                    if let Some(p) = parameter {
+                        sf.evidence.push(format!("Parameter: {}", p));
+                    }
+                    if let Some(pay) = payload {
+                        sf.evidence.push(format!("Payload: {}", pay));
+                    }
+                    sf.evidence.push(evidence.clone());
+                    sf.verified = false; // Must pass deterministic verification
+                    if state.add_finding(sf) {
                         new_findings += 1;
                     }
                 }
@@ -480,7 +598,7 @@ impl ObservationIngestion {
         }
     }
 
-    fn parse_endpoint_url(raw: &str) -> Option<(String, String, u16, String, Vec<String>)> {
+    pub fn parse_endpoint_url(raw: &str) -> Option<(String, String, u16, String, Vec<String>)> {
         let clean = raw.trim();
         let without_proto = clean.trim_start_matches("http://").trim_start_matches("https://");
         let host_and_rest = without_proto.split_once('/')?;

@@ -525,3 +525,286 @@ pub async fn get_investigation_archetype(
     Ok(Json(classification))
 }
 
+/// Handler for GET /api/investigations/:id/profile (v0.7)
+pub async fn get_investigation_profile(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::models::target_profile::TargetProfile>, (StatusCode, Json<serde_json::Value>)> {
+    if let Some(profile) = crate::models::target_profile::get_target_profile(&app_state, id).await {
+        return Ok(Json(profile));
+    }
+
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let profile = crate::intelligence::profiler::TargetProfiler::profile(id, &state);
+    let _ = crate::models::target_profile::save_target_profile(&app_state, &profile).await;
+    Ok(Json(profile))
+}
+
+/// Handler for GET /api/investigations/:id/policy (v0.7)
+pub async fn get_investigation_policy(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let profile = match crate::models::target_profile::get_target_profile(&app_state, id).await {
+        Some(p) => p,
+        None => {
+            let state = build_state_from_investigation(&app_state, id).await?;
+            let p = crate::intelligence::profiler::TargetProfiler::profile(id, &state);
+            let _ = crate::models::target_profile::save_target_profile(&app_state, &p).await;
+            p
+        }
+    };
+
+    let policy = crate::intelligence::policies::PolicyRegistry::get_policy_for(profile.archetype);
+
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = IntelligencePlanner::plan_with_policy(&state, None, None, None, None, Some(&profile));
+
+    Ok(Json(json!({
+        "investigation_id": id,
+        "policy_name": policy.name(),
+        "archetype": profile.archetype.as_str(),
+        "confidence": profile.confidence,
+        "target_profile": profile,
+        "recommended_action": plan.recommended_action,
+        "alternatives": plan.alternatives,
+    })))
+}
+
+/// Handler for GET /api/investigations/:id/education (Ars0n Phase 12)
+pub async fn get_investigation_education(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::education::EducationLesson>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let lesson = crate::intelligence::education::EducationEngine::generate_lesson(&state);
+    Ok(Json(lesson))
+}
+
+/// Handler for GET /api/investigations/:id/threats (Ars0n Phase 11)
+pub async fn get_investigation_threats(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::intelligence::threat_model::ThreatItem>>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let threats = crate::intelligence::threat_model::ThreatModelEngine::generate_model(&state);
+    Ok(Json(threats))
+}
+
+/// Handler for GET /api/investigations/:id/prioritization (Ars0n Phase 13)
+pub async fn get_investigation_prioritization(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::roi::TargetPrioritizationScore>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let profile = match crate::models::target_profile::get_target_profile(&app_state, id).await {
+        Some(p) => p,
+        None => {
+            let p = crate::intelligence::profiler::TargetProfiler::profile(id, &state);
+            let _ = crate::models::target_profile::save_target_profile(&app_state, &p).await;
+            p
+        }
+    };
+    let score = crate::intelligence::roi::RoiEngine::prioritize_target(&state.target, &state, &profile, Some(0.35));
+    Ok(Json(score))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BehaviorRequest {
+    pub target_url: String,
+}
+
+/// Handler for POST /api/investigations/:id/behavior (Ars0n Phase 10)
+pub async fn analyze_investigation_behavior(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<BehaviorRequest>,
+) -> Result<Json<crate::intelligence::behavior::BehaviorReport>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap_or_default();
+
+    let report = crate::intelligence::behavior::BehaviorAnalyzer::analyze_target_behavior(
+        &client,
+        &payload.target_url,
+        &state.scope,
+    )
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e }))))?;
+
+    Ok(Json(report))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FlowExecuteRequest {
+    pub flow: crate::intelligence::flows::RequestFlow,
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// Handler for POST /api/investigations/:id/flows/replay (Ars0n Phase 9)
+pub async fn replay_investigation_flow(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<FlowExecuteRequest>,
+) -> Result<Json<crate::intelligence::flows::FlowReplayResult>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap_or_default();
+
+    let result = crate::intelligence::flows::FlowEngine::execute_flow(
+        &client,
+        &payload.flow,
+        payload.dry_run,
+        &state.scope,
+    )
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e }))))?;
+
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AuthzTestRequest {
+    pub endpoint_template: String,
+    pub resource_id_a: String,
+    pub identity_b: crate::intelligence::authz::Identity,
+}
+
+/// Handler for POST /api/investigations/:id/authz/test (Ars0n Phase 8)
+pub async fn test_investigation_authz(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<AuthzTestRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap_or_default();
+
+    let obs_opt = crate::intelligence::authz::AuthzEngine::test_bola_access(
+        &client,
+        &payload.endpoint_template,
+        &payload.resource_id_a,
+        &payload.identity_b,
+        &state.scope,
+    )
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e }))))?;
+
+    Ok(Json(json!({
+        "investigation_id": id,
+        "vulnerability_candidate": obs_opt,
+    })))
+}
+
+/// Handler for GET /api/investigations/:id/adaptive-plan
+pub async fn get_adaptive_plan(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::adaptive_planner::AdaptivePlan>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+
+    if let Some(ref action) = plan.selected_action {
+        let decision = crate::models::planner_decision::PlannerDecision {
+            id: Uuid::new_v4(),
+            investigation_id: id,
+            selected_action: action.action_id.clone(),
+            capability: action.capability.as_str().to_string(),
+            target: action.target.clone(),
+            tool: action.tool.clone(),
+            score: action.score,
+            score_components: serde_json::to_value(&action.score_components).unwrap_or_default(),
+            reason: action.reason.clone(),
+            expected_information_gain: action.expected_information_gain,
+            estimated_cost: action.estimated_cost.clone(),
+            alternatives: serde_json::to_value(&plan.alternatives).unwrap_or_default(),
+            rejected_candidates: serde_json::to_value(&plan.rejected_candidates).unwrap_or_default(),
+            target_archetype: plan.target_archetype.clone(),
+            created_at: Utc::now(),
+        };
+        crate::models::planner_decision::save_planner_decision(&app_state, &decision).await;
+    }
+
+    Ok(Json(plan))
+}
+
+/// Handler for GET /api/investigations/:id/next-action
+pub async fn get_next_action(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+
+    if let Some(action) = plan.selected_action {
+        Ok(Json(json!({
+            "investigation_id": id,
+            "action": action.action_id,
+            "capability": action.capability.as_str(),
+            "tool": action.tool,
+            "target": action.target,
+            "score": action.score,
+            "score_components": action.score_components,
+            "reason": action.reason,
+            "required_tools": action.required_tools,
+            "estimated_cost": action.estimated_cost,
+            "risk_level": action.risk_level,
+            "expected_information_gain": action.expected_information_gain,
+            "target_archetype": plan.target_archetype,
+        })))
+    } else {
+        Ok(Json(json!({
+            "investigation_id": id,
+            "action": "stop",
+            "score": 0.0,
+            "reason": plan.reason,
+            "stop_reason": plan.stop_reason,
+        })))
+    }
+}
+
+/// Handler for GET /api/investigations/:id/explain-decision
+pub async fn explain_decision(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+    let latest_decision = crate::models::planner_decision::get_latest_planner_decision(&app_state, id).await;
+
+    Ok(Json(json!({
+        "investigation_id": id,
+        "current_plan": {
+            "selected_action": plan.selected_action,
+            "score": plan.score,
+            "score_components": plan.score_components,
+            "reason": plan.reason,
+            "target_archetype": plan.target_archetype,
+            "state_metrics": plan.state_metrics,
+            "alternatives": plan.alternatives,
+            "rejected_candidates": plan.rejected_candidates,
+        },
+        "persisted_decision": latest_decision,
+    })))
+}
+
+/// Handler for POST /api/investigations/:id/replan
+pub async fn replan_investigation(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::adaptive_planner::AdaptivePlan>, (StatusCode, Json<serde_json::Value>)> {
+    get_adaptive_plan(State(app_state), Path(id)).await
+}
+
+
+

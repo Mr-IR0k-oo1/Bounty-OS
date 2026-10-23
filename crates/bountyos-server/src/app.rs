@@ -132,6 +132,14 @@ pub fn create_router(
             get(crate::handlers::intelligence::get_investigation_archetype),
         )
         .route(
+            "/investigations/:id/profile",
+            get(crate::handlers::intelligence::get_investigation_profile),
+        )
+        .route(
+            "/investigations/:id/policy",
+            get(crate::handlers::intelligence::get_investigation_policy),
+        )
+        .route(
             "/experience/actions",
             get(crate::handlers::intelligence::get_experience_actions),
         )
@@ -142,6 +150,7 @@ pub fn create_router(
         .route(
             "/investigations/:id/stop",
             post(crate::handlers::intelligence::stop_investigation),
+        )
         );
 
     // Protected routes (require valid JWT access token)

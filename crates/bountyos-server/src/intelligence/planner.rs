@@ -23,6 +23,12 @@ pub struct InvestigationPlan {
     pub stop_reason: Option<StopReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strategic_summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_profile: Option<crate::models::target_profile::TargetProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_decision: Option<crate::intelligence::policies::PolicyDecision>,
 }
 
 pub struct IntelligencePlanner;
@@ -59,6 +65,18 @@ impl IntelligencePlanner {
         experience: Option<&[crate::models::experience::ExperienceAction]>,
         archetype: Option<&crate::intelligence::archetype::ArchetypeClassification>,
     ) -> InvestigationPlan {
+        Self::plan_with_policy(state, history, prioritization, experience, archetype, None)
+    }
+
+    /// Plan the next investigation step with Target-Specific Investigation Policies (v0.7)
+    pub fn plan_with_policy(
+        state: &InvestigationState,
+        history: Option<&std::collections::HashMap<String, crate::intelligence::action_value::HistoricalToolStats>>,
+        prioritization: Option<&crate::intelligence::llm::prioritization::StrategicPrioritization>,
+        experience: Option<&[crate::models::experience::ExperienceAction]>,
+        _archetype: Option<&crate::intelligence::archetype::ArchetypeClassification>,
+        profile_override: Option<&crate::models::target_profile::TargetProfile>,
+    ) -> InvestigationPlan {
         // Strategy A: Fixed Pipeline (subfinder -> naabu -> httpx -> katana -> nuclei)
         if state.profile == crate::intelligence::state::InvestigationProfile::Fixed {
             let fixed_tool_order = ["subfinder", "naabu", "httpx", "katana", "nuclei"];
@@ -87,6 +105,9 @@ impl IntelligencePlanner {
                     coverage_gaps: Vec::new(),
                     stop_reason: None,
                     strategic_summary: None,
+                    target_profile: None,
+                    policy_name: Some("Fixed Pipeline Policy".to_string()),
+                    policy_decision: None,
                 };
             } else {
                 return InvestigationPlan {
@@ -95,57 +116,78 @@ impl IntelligencePlanner {
                     coverage_gaps: Vec::new(),
                     stop_reason: Some(StopReason::NoLegalActions),
                     strategic_summary: None,
+                    target_profile: None,
+                    policy_name: Some("Fixed Pipeline Policy".to_string()),
+                    policy_decision: None,
                 };
             }
         }
 
-        // 1. Assess coverage gaps
-        let coverage_report = CoverageModel::assess(state);
-        let coverage_gaps = coverage_report.gaps;
-
-        // 2. Generate candidates from state and coverage gaps
-        let mut candidates = Self::generate_candidates(state);
-
-        // 3. Filter candidates by scope, execution history, and budget
-        candidates.retain(|cand| {
-            // Scope check: Out-of-scope targets are strictly excluded
-            if !state.is_in_scope(&cand.target) {
-                return false;
-            }
-
-            // Duplicate execution check
-            if state.has_executed_tool_on_target(&cand.tool, &cand.target) {
-                return false;
-            }
-
-            // Budget and rate limits
-            if BudgetManager::check(state, &cand.tool, cand.risk).is_err() {
-                return false;
-            }
-
-            true
-        });
-
-        // 4. Resolve Target Archetype for conditional experience V(a | archetype, technology)
-        let fallback_archetype;
-        let arch_ref = match archetype {
-            Some(a) => a,
+        // 1. Target Profile generation from observed evidence (v0.7)
+        let fallback_profile;
+        let target_profile = match profile_override {
+            Some(p) => p,
             None => {
-                fallback_archetype = crate::intelligence::archetype::TargetArchetypeClassifier::classify(state);
-                &fallback_archetype
+                fallback_profile = crate::intelligence::profiler::TargetProfiler::profile(uuid::Uuid::nil(), state);
+                &fallback_profile
             }
         };
 
-        // 5. Score candidates: Rule baseline + adaptive empirical stats + bounded VulnLLM strategic boost + global experience
+        // 2. Select Investigation Policy matching the target profile archetype
+        let policy = crate::intelligence::policies::PolicyRegistry::get_policy_for(target_profile.archetype);
+
+        // 3. Assess coverage gaps
+        let coverage_report = CoverageModel::assess(state);
+        let coverage_gaps = coverage_report.gaps;
+
+        // 4. Generate candidate actions: baseline state candidates + policy-specific candidate actions (v0.7)
+        let mut candidates = Self::generate_candidates(state);
+        let is_policy_enabled = state.profile != crate::intelligence::state::InvestigationProfile::Standard;
+        if is_policy_enabled {
+            let policy_candidates = policy.generate_candidate_actions(state, target_profile);
+            candidates.extend(policy_candidates);
+        }
+
+        // Deduplicate candidates by (action_type, tool, target)
+        let mut seen = std::collections::HashSet::new();
+        candidates.retain(|c| seen.insert((c.action_type, c.tool.clone(), c.target.clone())));
+
+        // 5. Filter candidates by scope, execution history, and budget (Scope gate remains mandatory)
+        candidates.retain(|cand| {
+            if !state.is_in_scope(&cand.target) {
+                return false;
+            }
+            if state.has_executed_tool_on_target(&cand.tool, &cand.target) {
+                return false;
+            }
+            if BudgetManager::check(state, &cand.tool, cand.risk).is_err() {
+                return false;
+            }
+            true
+        });
+
+        // Compute baseline prior score for each candidate
+        for cand in candidates.iter_mut() {
+            cand.score = ActionScorer::compute(cand.info_gain, cand.relevance, cand.confidence, cand.cost, cand.risk);
+        }
+
+        // 6. Apply Target Investigation Policy adjustments (v0.7)
+        // Generic/Standard baseline does not apply target-specific policy weights (enables benchmark comparison)
+        if is_policy_enabled {
+            policy.adjust_candidate_actions(target_profile, &mut candidates);
+        }
+
+        // 7. Score candidates: Policy weighting + adaptive empirical stats + bounded VulnLLM strategic boost + global experience
         let is_adaptive = state.profile == crate::intelligence::state::InvestigationProfile::Adaptive
             || state.profile == crate::intelligence::state::InvestigationProfile::Strategic
+            || state.profile == crate::intelligence::state::InvestigationProfile::Policy
             || history.is_some()
             || experience.is_some();
 
         let mut scored_actions: Vec<PlannedAction> = candidates
             .into_iter()
             .map(|c| {
-                let prior_score = ActionScorer::compute(c.info_gain, c.relevance, c.confidence, c.cost, c.risk);
+                let prior_score = c.score;
                 let (empirical_score, empirical_note) = if is_adaptive {
                     crate::intelligence::action_value::ActionValueModel::estimate_adaptive_score(
                         prior_score,
@@ -180,7 +222,7 @@ impl IntelligencePlanner {
 
                 // Cross-Investigation Experience Scoring & Pruning (v0.6)
                 let (final_score, experience_note) = if let Some(exp_list) = experience {
-                    let arch_str = arch_ref.archetype.as_str();
+                    let arch_str = target_profile.archetype.as_str();
                     let match_exp = exp_list.iter().find(|e| {
                         e.archetype == arch_str && e.tool == c.tool && e.action_type == c.action_type.as_str()
                     }).or_else(|| {
@@ -212,7 +254,7 @@ impl IntelligencePlanner {
                     (composite_score, String::new())
                 };
 
-                let mut reason_parts = vec![c.reason];
+                let mut reason_parts = vec![c.reason.clone()];
                 if !score_note.is_empty() {
                     reason_parts.push(score_note);
                 }
@@ -221,7 +263,12 @@ impl IntelligencePlanner {
                 }
                 let full_reason = reason_parts.join(" | ");
 
-                let mut planned = PlannedAction::new(c.action_type, c.tool, c.target, full_reason, final_score);
+                // Policy Provenance (v0.7)
+                let policy_reasons = policy.policy_reasons(&c, target_profile);
+                let evidence_refs = policy.evidence_refs(&c, target_profile);
+
+                let mut planned = PlannedAction::new(c.action_type, c.tool, c.target, full_reason, final_score)
+                    .with_provenance(policy_reasons, evidence_refs);
                 planned.context = c.context;
                 planned
             })
@@ -230,11 +277,12 @@ impl IntelligencePlanner {
         // Sort descending by score
         scored_actions.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
-        // 5. Evaluate stopping conditions
+        // Evaluate stopping conditions
         let best_score = scored_actions.first().map(|a| a.score);
         let stop_reason = StoppingChecker::evaluate(state, best_score, None);
-
         let strategic_summary = prioritization.map(|p| p.strategic_summary.clone());
+
+        let policy_name_str = policy.name().to_string();
 
         if let Some(reason) = stop_reason {
             let reason_desc = match &reason {
@@ -248,16 +296,21 @@ impl IntelligencePlanner {
                 StopReason::MaxFindingsReached(n) => format!("Maximum findings reached ({})", n),
             };
 
+            let stop_action = PlannedAction::stop(reason_desc);
+            let policy_decision = Some(stop_action.to_policy_decision(&policy_name_str));
+
             return InvestigationPlan {
-                recommended_action: Some(PlannedAction::stop(reason_desc)),
+                recommended_action: Some(stop_action),
                 alternatives: Vec::new(),
                 coverage_gaps,
                 stop_reason: Some(reason),
                 strategic_summary,
+                target_profile: Some(target_profile.clone()),
+                policy_name: Some(policy_name_str),
+                policy_decision,
             };
         }
 
-        // 6. Split into recommended action and alternatives
         let recommended_action = scored_actions.first().cloned();
         let alternatives = if scored_actions.len() > 1 {
             scored_actions[1..].to_vec()
@@ -265,12 +318,17 @@ impl IntelligencePlanner {
             Vec::new()
         };
 
+        let policy_decision = recommended_action.as_ref().map(|a| a.to_policy_decision(&policy_name_str));
+
         InvestigationPlan {
             recommended_action,
             alternatives,
             coverage_gaps,
             stop_reason: None,
             strategic_summary,
+            target_profile: Some(target_profile.clone()),
+            policy_name: Some(policy_name_str),
+            policy_decision,
         }
     }
 
@@ -677,8 +735,16 @@ mod tests {
         state.hosts[0].ports_scanned = true;
 
         // Add endpoint with reflected parameter
-        state.add_endpoint("http://target.local/search?q=test", "katana");
-        state.add_parameter("http://target.local/search?q=test", "q", "query", true);
+        let mut ep = DiscoveredEndpoint::new("http://target.local/search?q=test", "target.local", 80, "/search?q=test");
+        ep.params.push(DiscoveredParam {
+            name: "q".to_string(),
+            location: ParamLocation::Query,
+            reflected: true,
+            reflection_context: Some("attribute".to_string()),
+            tested_for_xss: false,
+            tested_for_sqli: false,
+        });
+        state.add_endpoint(ep);
 
         // Baseline plan without strategic boost
         let baseline_plan = IntelligencePlanner::plan(&state);
@@ -718,6 +784,15 @@ mod tests {
         ep.content_type = Some("application/json".to_string());
         state.endpoints.push(ep);
 
+        // Add technology to generate nuclei candidate action
+        state.technologies.push(DiscoveredTechnology {
+            name: "nginx".to_string(),
+            version: Some("1.20".to_string()),
+            cpe: None,
+            category: Some("Web Server".to_string()),
+            templates_matched: Vec::new(),
+        });
+
         let mut subfinder_exp = crate::models::experience::ExperienceAction::new(
             "rest_api",
             "*",
@@ -732,7 +807,7 @@ mod tests {
         let plan = IntelligencePlanner::plan_experience(&state, None, None, Some(&experience_list), None);
         let rec = plan.recommended_action.expect("Expected recommended action");
         // With subfinder pruned due to low empirical value (0.03 over 35 runs on rest_api),
-        // another high-value action should be selected over subfinder.
+        // another high-value action (nuclei) should be selected over subfinder.
         assert_ne!(rec.tool, "subfinder", "Pruned tool with 35 low-value runs must not be recommended");
     }
 
@@ -740,7 +815,8 @@ mod tests {
     fn test_case_15_exploration_prevents_premature_pruning() {
         let mut scope = ScopeBoundary::new();
         scope.domains.push("target.local".to_string());
-        let state = InvestigationState::new("target.local", scope, InvestigationProfile::Standard);
+        let mut state = InvestigationState::new("target.local", scope, InvestigationProfile::Standard);
+        state.hosts[0].ports_scanned = true; // prevent naabu on root host
 
         // Experience with only 3 samples: must not be pruned despite low value
         let mut subfinder_exp = crate::models::experience::ExperienceAction::new(
@@ -760,5 +836,75 @@ mod tests {
         assert_eq!(rec.tool, "subfinder");
         assert!(rec.reason.contains("Sample count 3 < 10: pruning disabled"));
     }
+
+    #[test]
+    fn test_case_16_target_policy_differentiation_rest_vs_web() {
+        let mut scope = ScopeBoundary::new();
+        scope.domains.push("api.target.local".to_string());
+        let mut state = InvestigationState::new("api.target.local", scope, InvestigationProfile::Policy);
+        state.hosts[0].ports_scanned = true;
+
+        let mut ep = DiscoveredEndpoint::new("http://api.target.local/v1/users", "api.target.local", 80, "/v1/users");
+        ep.content_type = Some("application/json".to_string());
+        state.endpoints.push(ep);
+
+        let plan = IntelligencePlanner::plan(&state);
+        assert!(plan.target_profile.is_some());
+        let profile = plan.target_profile.unwrap();
+        assert_eq!(profile.archetype, crate::intelligence::archetype::TargetArchetype::RestApi);
+        assert_eq!(plan.policy_name, Some("REST API Policy".to_string()));
+
+        let rec = plan.recommended_action.expect("Expected recommendation");
+        assert!(!rec.policy_reasons.is_empty(), "Decision must contain policy reasons");
+        assert!(!rec.evidence_refs.is_empty(), "Decision must contain evidence references");
+    }
+
+    #[test]
+    fn test_case_17_target_policy_provenance_and_technology_weighting() {
+        let mut scope = ScopeBoundary::new();
+        scope.domains.push("blog.target.local".to_string());
+        let mut state = InvestigationState::new("blog.target.local", scope, InvestigationProfile::Policy);
+        state.hosts[0].ports_scanned = true;
+
+        state.technologies.push(DiscoveredTechnology {
+            name: "WordPress".to_string(),
+            version: Some("6.2".to_string()),
+            cpe: None,
+            category: Some("CMS".to_string()),
+            templates_matched: Vec::new(),
+        });
+
+        let ep = DiscoveredEndpoint::new("http://blog.target.local/wp-login.php", "blog.target.local", 80, "/wp-login.php");
+        state.endpoints.push(ep);
+
+        let plan = IntelligencePlanner::plan(&state);
+        let profile = plan.target_profile.expect("Profile must be generated");
+        assert!(profile.has_technology("wordpress"));
+        assert_eq!(plan.policy_name, Some("Web Legacy Application Policy".to_string()));
+
+        let rec = plan.recommended_action.expect("Recommended action present");
+        assert!(rec.policy_reasons.iter().any(|r| r.contains("WordPress") || r.contains("Web Legacy")));
+    }
+
+    #[test]
+    fn test_case_18_policy_scope_gate_strictness() {
+        let mut scope = ScopeBoundary::new();
+        scope.domains.push("allowed.local".to_string());
+        scope.excluded_hosts.push("forbidden.allowed.local".to_string());
+
+        let mut state = InvestigationState::new("allowed.local", scope, InvestigationProfile::Policy);
+        state.hosts[0].ports_scanned = true;
+
+        // Attempting to add an endpoint on forbidden host
+        let ep = DiscoveredEndpoint::new("http://forbidden.allowed.local/api/v1/keys", "forbidden.allowed.local", 80, "/api/v1/keys");
+        state.endpoints.push(ep);
+
+        let plan = IntelligencePlanner::plan(&state);
+        if let Some(rec) = plan.recommended_action {
+            assert_ne!(rec.target, "forbidden.allowed.local");
+            assert!(!rec.target.contains("forbidden"));
+        }
+    }
 }
+
 

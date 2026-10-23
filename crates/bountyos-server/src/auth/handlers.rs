@@ -38,21 +38,28 @@ pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    // Find the hunter by username
+    let clean_username = payload.username.trim();
+
+    // Find the hunter by username (case-insensitive)
     let hunter = if state.has_db() {
-        match sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE username = $1"#)
-            .bind(&payload.username)
+        match sqlx::query_as::<_, Hunter>(r#"SELECT * FROM hunters WHERE LOWER(username) = LOWER($1)"#)
+            .bind(clean_username)
             .fetch_optional(state.db())
             .await
         {
             Ok(Some(h)) => Some(h),
             Ok(None) => None,
-            Err(_) => state.find_hunter(&payload.username).await,
+            Err(_) => state.find_hunter(clean_username).await,
         }
     } else {
-        state.find_hunter(&payload.username).await
+        state.find_hunter(clean_username).await
     }
     .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Check if account is active
+    if !hunter.active {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
 
     // Verify the password
     if !crate::auth::password::verify_password(&payload.password, &hunter.password_hash) {
@@ -86,8 +93,14 @@ pub async fn login(
         crate::auth::tokens::generate_tokens(&hunter.id, &state.config().jwt_secret)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Store the refresh token in Redis (if available)
+    // Store the refresh token and clear any previous session blacklist in Redis (if available)
     if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let session_key = format!("session:{}", hunter.id);
+        let _ = redis::cmd("DEL")
+            .arg(&session_key)
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+
         let refresh_token_key = format!("refresh_token:{}", hunter.id);
         let _ = redis::cmd("SET")
             .arg(&refresh_token_key)
@@ -111,7 +124,7 @@ pub async fn logout(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // Blacklist the session in Redis (if available)
+    // Blacklist the session and delete refresh token in Redis (if available)
     if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
         let session_key = format!("session:{}", user_id);
         let _ = redis::cmd("SET")
@@ -119,6 +132,12 @@ pub async fn logout(
             .arg("1")
             .arg("EX")
             .arg(7 * 24 * 60 * 60) // 7 days
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+
+        let refresh_token_key = format!("refresh_token:{}", user_id);
+        let _ = redis::cmd("DEL")
+            .arg(&refresh_token_key)
             .query_async::<_, ()>(&mut redis_conn)
             .await;
     }
@@ -288,8 +307,14 @@ pub async fn verify_2fa(
         crate::auth::tokens::generate_tokens(&hunter.id, &state.config().jwt_secret)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Store the refresh token in Redis
+    // Store the refresh token and clear any previous session blacklist in Redis
     if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let session_key = format!("session:{}", hunter.id);
+        let _ = redis::cmd("DEL")
+            .arg(&session_key)
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+
         let refresh_token_key = format!("refresh_token:{}", hunter.id);
         let _ = redis::cmd("SET")
             .arg(&refresh_token_key)
@@ -384,6 +409,24 @@ pub async fn setup(
     let (access_token, refresh_token) =
         crate::auth::tokens::generate_tokens(&admin_id, &state.config().jwt_secret)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Token error: {:?}", e)))?;
+
+    // Store the refresh token and clear any previous session blacklist in Redis (if available)
+    if let Ok(mut redis_conn) = state.redis().get_async_connection().await {
+        let session_key = format!("session:{}", admin_id);
+        let _ = redis::cmd("DEL")
+            .arg(&session_key)
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+
+        let refresh_token_key = format!("refresh_token:{}", admin_id);
+        let _ = redis::cmd("SET")
+            .arg(&refresh_token_key)
+            .arg(&refresh_token)
+            .arg("EX")
+            .arg(7 * 24 * 60 * 60) // 7 days
+            .query_async::<_, ()>(&mut redis_conn)
+            .await;
+    }
 
     Ok(Json(SetupResponse {
         message: "Account setup successful".to_string(),

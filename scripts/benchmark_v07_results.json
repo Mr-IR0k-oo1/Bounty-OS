@@ -1,0 +1,279 @@
+{
+  "timestamp": "2026-10-23T04:56:42.737Z",
+  "benchmark": "v0.7 Target-Specific Investigation Policies",
+  "summary": {
+    "S1": {
+      "name": "Fixed Pipeline",
+      "profile": "fixed",
+      "trials": 3,
+      "confirmedFindings": {
+        "mean": 0,
+        "std": 0
+      },
+      "usefulDiscoveries": {
+        "mean": 3,
+        "std": 1.7320508075688772
+      },
+      "ttffMs": {
+        "mean": 14371,
+        "std": 320
+      },
+      "totalToolRuns": {
+        "mean": 5,
+        "std": 0
+      },
+      "redundantRuns": {
+        "mean": 2,
+        "std": 0
+      },
+      "falsePositives": {
+        "mean": 0,
+        "std": 0
+      },
+      "verificationRate": {
+        "mean": 100,
+        "std": 0
+      },
+      "resourceConsumption": {
+        "mean": 31.866666666666664,
+        "std": 0.32145502536643233
+      }
+    },
+    "S2": {
+      "name": "Generic Planner",
+      "profile": "standard",
+      "trials": 3,
+      "confirmedFindings": {
+        "mean": 0,
+        "std": 0
+      },
+      "usefulDiscoveries": {
+        "mean": 8,
+        "std": 0
+      },
+      "ttffMs": {
+        "mean": 4591,
+        "std": 13
+      },
+      "totalToolRuns": {
+        "mean": 3,
+        "std": 0
+      },
+      "redundantRuns": {
+        "mean": 0,
+        "std": 0
+      },
+      "falsePositives": {
+        "mean": 0,
+        "std": 0
+      },
+      "verificationRate": {
+        "mean": 100,
+        "std": 0
+      },
+      "resourceConsumption": {
+        "mean": 14.1,
+        "std": 0
+      }
+    },
+    "S3": {
+      "name": "Target Policy Planner",
+      "profile": "policy",
+      "trials": 3,
+      "confirmedFindings": {
+        "mean": 0,
+        "std": 0
+      },
+      "usefulDiscoveries": {
+        "mean": 8,
+        "std": 0
+      },
+      "ttffMs": {
+        "mean": 14458,
+        "std": 14456
+      },
+      "totalToolRuns": {
+        "mean": 5,
+        "std": 0
+      },
+      "redundantRuns": {
+        "mean": 0,
+        "std": 0
+      },
+      "falsePositives": {
+        "mean": 0,
+        "std": 0
+      },
+      "verificationRate": {
+        "mean": 100,
+        "std": 0
+      },
+      "resourceConsumption": {
+        "mean": 31.433333333333334,
+        "std": 14.434103135745337
+      }
+    }
+  },
+  "trials": [
+    {
+      "strategyKey": "S1",
+      "strategyName": "Fixed Pipeline",
+      "trialIndex": 1,
+      "profile": "fixed",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 14565,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 4,
+      "ttffMs": 14565,
+      "totalToolRuns": 5,
+      "redundantRuns": 2,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 32.1
+    },
+    {
+      "strategyKey": "S1",
+      "strategyName": "Fixed Pipeline",
+      "trialIndex": 2,
+      "profile": "fixed",
+      "targetUrl": "http://127.0.0.1:8888",
+      "policyName": "Generic Investigation Policy",
+      "durationMs": 14546,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 1,
+      "ttffMs": 14546,
+      "totalToolRuns": 5,
+      "redundantRuns": 2,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 32
+    },
+    {
+      "strategyKey": "S1",
+      "strategyName": "Fixed Pipeline",
+      "trialIndex": 3,
+      "profile": "fixed",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 14001,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 4,
+      "ttffMs": 14001,
+      "totalToolRuns": 5,
+      "redundantRuns": 2,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 31.5
+    },
+    {
+      "strategyKey": "S2",
+      "strategyName": "Generic Planner",
+      "trialIndex": 1,
+      "profile": "standard",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 4605,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 4605,
+      "totalToolRuns": 3,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 14.1
+    },
+    {
+      "strategyKey": "S2",
+      "strategyName": "Generic Planner",
+      "trialIndex": 2,
+      "profile": "standard",
+      "targetUrl": "http://127.0.0.1:8888",
+      "policyName": "Web Modern Application Policy",
+      "durationMs": 4582,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 4582,
+      "totalToolRuns": 3,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 14.1
+    },
+    {
+      "strategyKey": "S2",
+      "strategyName": "Generic Planner",
+      "trialIndex": 3,
+      "profile": "standard",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 4585,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 4585,
+      "totalToolRuns": 3,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 14.1
+    },
+    {
+      "strategyKey": "S3",
+      "strategyName": "Target Policy Planner",
+      "trialIndex": 1,
+      "profile": "policy",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 5977,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 5977,
+      "totalToolRuns": 5,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 23
+    },
+    {
+      "strategyKey": "S3",
+      "strategyName": "Target Policy Planner",
+      "trialIndex": 2,
+      "profile": "policy",
+      "targetUrl": "http://127.0.0.1:8888",
+      "policyName": "Web Modern Application Policy",
+      "durationMs": 31149,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 31149,
+      "totalToolRuns": 5,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 48.1
+    },
+    {
+      "strategyKey": "S3",
+      "strategyName": "Target Policy Planner",
+      "trialIndex": 3,
+      "profile": "policy",
+      "targetUrl": "http://127.0.0.1:8888/api/v1/config",
+      "policyName": "REST API Policy",
+      "durationMs": 6247,
+      "confirmedFindings": 0,
+      "usefulDiscoveries": 8,
+      "ttffMs": 6247,
+      "totalToolRuns": 5,
+      "redundantRuns": 0,
+      "falsePositives": 0,
+      "verificationRate": 100,
+      "resourceConsumption": 23.2
+    }
+  ],
+  "measurable_improvements": {
+    "ttff_improvement_pct_vs_fixed": -0.6,
+    "ttff_improvement_pct_vs_generic": -214.9,
+    "waste_reduction_pct_vs_fixed": 100,
+    "discoveries_gain_pct_vs_generic": 0,
+    "false_positive_rate": 0
+  }
+}

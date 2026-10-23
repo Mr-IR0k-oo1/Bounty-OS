@@ -109,6 +109,7 @@ pub enum InvestigationProfile {
     Adaptive,
     Fixed,
     Strategic,
+    Policy,
 }
 
 impl Default for InvestigationProfile {
@@ -702,10 +703,13 @@ impl InvestigationState {
     }
 
     /// Add a vulnerability finding
-    pub fn add_finding(&mut self, finding: StateFinding) {
+    pub fn add_finding(&mut self, finding: StateFinding) -> bool {
         if !self.findings.iter().any(|f| f.title == finding.title && f.target == finding.target) {
             self.findings.push(finding);
             self.updated_at = Utc::now();
+            true
+        } else {
+            false
         }
     }
 

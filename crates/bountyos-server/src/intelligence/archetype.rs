@@ -100,6 +100,19 @@ impl TargetArchetypeClassifier {
         let mut multi_host_score = 0.0;
         let mut multi_host_evidence = Vec::new();
 
+        // 0. Inspect initial target route seed if explicit route provided
+        let target_lower = state.target.to_lowercase();
+        if target_lower.contains("/api/") || target_lower.contains("/v1/") || target_lower.contains("/v2/") || target_lower.ends_with("/api") {
+            api_score += 0.50;
+            api_evidence.push(format!("Target initial seed route indicates REST API: {}", state.target));
+        } else if target_lower.contains("/graphql") || target_lower.contains("/graphiql") {
+            graphql_score += 0.60;
+            graphql_evidence.push(format!("Target initial seed route indicates GraphQL: {}", state.target));
+        } else if target_lower.contains("/admin") || target_lower.contains("/login") || target_lower.contains("/oauth") || target_lower.contains("/auth") {
+            auth_score += 0.50;
+            auth_evidence.push(format!("Target initial seed route indicates Auth boundary: {}", state.target));
+        }
+
         // 1. Inspect endpoints and parameter structures
         for ep in &state.endpoints {
             let path_lower = ep.path.to_lowercase();
@@ -141,6 +154,19 @@ impl TargetArchetypeClassifier {
                 auth_evidence.push(format!("HTTP {} access restricted status code on {}", ep.status_code.unwrap(), ep.path));
             }
 
+            // SPA signals (JavaScript bundles, chunk distribution, client routers)
+            if path_lower.contains("/bundle") || path_lower.contains("/chunk") || path_lower.contains("/static/js") || (path_lower.ends_with(".js") && (path_lower.contains("app") || path_lower.contains("main") || path_lower.contains("vendor"))) {
+                spa_score += 0.45;
+                spa_evidence.push(format!("Client-side JavaScript bundle endpoint: {}", ep.path));
+            }
+            if let Some(ct) = &ep.content_type {
+                let ct_lower = ct.to_lowercase();
+                if ct_lower.contains("javascript") && (path_lower.contains("chunk") || path_lower.contains("bundle") || path_lower.contains("main") || path_lower.contains("app")) {
+                    spa_score += 0.40;
+                    spa_evidence.push(format!("JavaScript bundle content-type on {}", ep.path));
+                }
+            }
+
             // Legacy web signals
             if path_lower.ends_with(".php") || path_lower.ends_with(".asp") || path_lower.ends_with(".aspx") || path_lower.ends_with(".jsp") {
                 legacy_score += 0.45;
@@ -174,7 +200,17 @@ impl TargetArchetypeClassifier {
             }
         }
 
-        // 3. Inspect multi-host topology
+        // 3. Inspect discovered services for standard web application surfaces
+        for svc in &state.services {
+            if svc.port == 80 || svc.port == 443 || svc.port == 8080 || svc.port == 8888 || svc.port == 3000 || svc.service_name.as_deref() == Some("http") || svc.service_name.as_deref() == Some("https") {
+                if api_score == 0.0 && graphql_score == 0.0 && auth_score == 0.0 && legacy_score == 0.0 && spa_score == 0.0 {
+                    modern_score += 0.35;
+                    modern_evidence.push(format!("Discovered web application service on port {}", svc.port));
+                }
+            }
+        }
+
+        // 4. Inspect multi-host topology
         let active_hosts = state.hosts.len();
         let subdomains_count = state.subdomains.len();
         if active_hosts > 1 || subdomains_count > 3 {
@@ -182,7 +218,7 @@ impl TargetArchetypeClassifier {
             multi_host_evidence.push(format!("Multi-host topology: {} active hosts, {} subdomains", active_hosts, subdomains_count));
         }
 
-        // 4. Static site fallback check
+        // 5. Static site fallback check
         if state.endpoints.len() >= 2 && state.endpoints.iter().all(|e| e.params.is_empty() && (e.path.ends_with(".html") || e.path == "/")) && legacy_score == 0.0 && api_score == 0.0 {
             static_score += 0.50;
             static_evidence.push("Static HTML documents with zero dynamic parameters".to_string());

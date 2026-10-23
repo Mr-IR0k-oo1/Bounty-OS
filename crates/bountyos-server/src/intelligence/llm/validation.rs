@@ -245,6 +245,7 @@ mod tests {
     fn test_validation_rejects_target_not_in_graph() {
         let mut scope = ScopeBoundary::new();
         scope.domains.push("target.local".to_string());
+        scope.domains.push("nonexistent-hallucination.local".to_string());
         let state = InvestigationState::new("target.local", scope, InvestigationProfile::Standard);
 
         let inv_id = uuid::Uuid::new_v4();
@@ -332,7 +333,13 @@ mod tests {
         let mut scope = ScopeBoundary::new();
         scope.domains.push("target.local".to_string());
         let mut state = InvestigationState::new("target.local", scope, InvestigationProfile::Standard);
-        state.add_endpoint("http://target.local/search?q=test", "katana");
+        let ep = crate::intelligence::state::DiscoveredEndpoint::new(
+            "http://target.local/search?q=test",
+            "target.local",
+            80,
+            "/search?q=test",
+        );
+        state.add_endpoint(ep);
 
         let inv_id = uuid::Uuid::new_v4();
         let hyp = SecurityHypothesis::new(

@@ -600,11 +600,20 @@ export class BountyOSClient {
     return this.request<ArchetypeClassificationRecord>(`/investigations/${investigationId}/archetype`);
   }
 
+  async getInvestigationProfile(investigationId: string): Promise<TargetProfileRecord> {
+    return this.request<TargetProfileRecord>(`/investigations/${investigationId}/profile`);
+  }
+
+  async getInvestigationPolicy(investigationId: string): Promise<TargetPolicyRecord> {
+    return this.request<TargetPolicyRecord>(`/investigations/${investigationId}/policy`);
+  }
+
   async stopInvestigation(investigationId: string): Promise<any> {
     return this.request<any>(`/investigations/${investigationId}/stop`, {
       method: "POST",
     });
   }
+
 }
 
 export interface PlannedAction {
@@ -620,6 +629,8 @@ export interface PlannedAction {
   cost?: number;
   risk?: number;
   context?: Record<string, string>;
+  policy_reasons?: string[];
+  evidence_refs?: string[];
 }
 
 export interface CoverageGap {
@@ -635,6 +646,8 @@ export interface InvestigationPlan {
   coverage_gaps: CoverageGap[];
   stop_reason: any | null;
   strategic_summary?: string | null;
+  target_profile?: TargetProfileRecord | null;
+  policy_name?: string | null;
 }
 
 export interface SecurityHypothesisRecord {
@@ -740,6 +753,8 @@ export interface InvestigationRunSummary {
   total_endpoints: number;
   total_information_gain: number;
   archetype?: ArchetypeClassificationRecord;
+  target_profile?: TargetProfileRecord | null;
+  policy_name?: string | null;
 }
 
 export interface ExperienceActionRecord {
@@ -782,5 +797,32 @@ export interface ArchetypeClassificationRecord {
   archetype: string;
   confidence: number;
   evidence: string[];
+}
+
+export interface TargetProfileRecord {
+  id: string;
+  investigation_id: string;
+  archetype: string;
+  technologies: string[];
+  exposed_services: string[];
+  application_type: string;
+  authentication_state: string;
+  api_indicators: boolean;
+  javascript_heavy: boolean;
+  historical_url_density: number;
+  evidence: string[];
+  confidence: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TargetPolicyRecord {
+  investigation_id: string;
+  policy_name: string;
+  archetype: string;
+  confidence: number;
+  target_profile: TargetProfileRecord;
+  recommended_action: PlannedAction | null;
+  alternatives: PlannedAction[];
 }
 

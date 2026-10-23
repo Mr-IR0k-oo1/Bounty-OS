@@ -31,6 +31,7 @@ pub struct AppState {
     in_memory_hypotheses: Arc<tokio::sync::RwLock<Vec<crate::models::hypothesis::SecurityHypothesis>>>,
     in_memory_experience: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceAction>>>,
     in_memory_provenance: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceProvenance>>>,
+    in_memory_target_profiles: Arc<tokio::sync::RwLock<Vec<crate::models::target_profile::TargetProfile>>>,
 }
 
 impl AppState {
@@ -55,6 +56,7 @@ impl AppState {
         let in_memory_hypotheses = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_experience = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_provenance = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_target_profiles = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         Self {
             db_pool,
             redis_pool,
@@ -75,6 +77,7 @@ impl AppState {
             in_memory_hypotheses,
             in_memory_experience,
             in_memory_provenance,
+            in_memory_target_profiles,
         }
     }
 
@@ -133,7 +136,8 @@ impl AppState {
 
     pub async fn find_hunter(&self, username: &str) -> Option<crate::models::hunter::Hunter> {
         let hunters = self.in_memory_hunters.read().await;
-        hunters.iter().find(|h| h.username == username).cloned()
+        let clean = username.trim();
+        hunters.iter().find(|h| h.username.eq_ignore_ascii_case(clean)).cloned()
     }
 
     pub async fn get_hunter_by_id(&self, id: &uuid::Uuid) -> Option<crate::models::hunter::Hunter> {
@@ -631,6 +635,12 @@ impl AppState {
         &self,
     ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceProvenance>>> {
         &self.in_memory_provenance
+    }
+
+    pub fn in_memory_target_profiles(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::target_profile::TargetProfile>>> {
+        &self.in_memory_target_profiles
     }
 
     pub fn db(&self) -> &PgPool {

@@ -80,6 +80,10 @@ pub struct InvestigationRunSummary {
     pub hypotheses: Vec<crate::models::hypothesis::SecurityHypothesis>,
     #[serde(default)]
     pub archetype: Option<crate::intelligence::archetype::ArchetypeClassification>,
+    #[serde(default)]
+    pub target_profile: Option<crate::models::target_profile::TargetProfile>,
+    #[serde(default)]
+    pub policy_name: Option<String>,
     pub stop_reason: Option<String>,
     pub initial_state_summary: StateSummary,
     pub final_state_summary: StateSummary,
@@ -229,12 +233,16 @@ impl AutonomousInvestigationRunner {
             let archetype_classification = crate::intelligence::archetype::TargetArchetypeClassifier::classify(&state);
             let global_experience = crate::intelligence::experience::GlobalExperienceStore::list_experience(app_state).await;
 
-            let plan = IntelligencePlanner::plan_experience(
+            let target_profile = crate::intelligence::profiler::TargetProfiler::profile(investigation_id, &state);
+            let _ = crate::models::target_profile::save_target_profile(app_state, &target_profile).await;
+
+            let plan = IntelligencePlanner::plan_with_policy(
                 &state,
                 Some(&historical_stats),
                 prioritization.as_ref(),
                 Some(&global_experience),
                 Some(&archetype_classification),
+                Some(&target_profile),
             );
             let action = match plan.recommended_action {
                 Some(a) => a,
@@ -449,6 +457,9 @@ impl AutonomousInvestigationRunner {
 
         let final_hypotheses = crate::intelligence::llm::hypothesis::list_hypotheses(app_state, investigation_id).await;
         let final_archetype = crate::intelligence::archetype::TargetArchetypeClassifier::classify(&state);
+        let final_profile = crate::intelligence::profiler::TargetProfiler::profile(investigation_id, &state);
+        let _ = crate::models::target_profile::save_target_profile(app_state, &final_profile).await;
+        let final_policy = crate::intelligence::policies::PolicyRegistry::get_policy_for(final_profile.archetype);
 
         Ok(InvestigationRunSummary {
             investigation_id,
@@ -459,6 +470,8 @@ impl AutonomousInvestigationRunner {
             outcomes,
             hypotheses: final_hypotheses,
             archetype: Some(final_archetype),
+            target_profile: Some(final_profile),
+            policy_name: Some(final_policy.name().to_string()),
             stop_reason,
             initial_state_summary,
             final_state_summary,

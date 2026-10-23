@@ -57,6 +57,7 @@ pub struct CandidateAction {
     pub tool: String,
     pub target: String,
     pub reason: String,
+    pub score: f64,
     pub info_gain: f64,
     pub relevance: f64,
     pub confidence: f64,
@@ -77,6 +78,7 @@ impl CandidateAction {
             tool: tool.into(),
             target: target.into(),
             reason: reason.into(),
+            score: 0.0,
             info_gain: 0.5,
             relevance: 0.5,
             confidence: 0.5,
@@ -123,6 +125,10 @@ pub struct PlannedAction {
     pub cost: f64,
     pub risk: f64,
     pub context: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
 }
 
 impl PlannedAction {
@@ -147,6 +153,8 @@ impl PlannedAction {
             cost,
             risk,
             context: HashMap::new(),
+            policy_reasons: Vec::new(),
+            evidence_refs: Vec::new(),
         }
     }
 
@@ -166,6 +174,25 @@ impl PlannedAction {
         self
     }
 
+    pub fn with_provenance(mut self, policy_reasons: Vec<String>, evidence_refs: Vec<String>) -> Self {
+        self.policy_reasons = policy_reasons;
+        self.evidence_refs = evidence_refs;
+        self
+    }
+
+    /// Convert planned action to structured policy provenance decision (v0.7)
+    pub fn to_policy_decision(&self, policy_name: &str) -> crate::intelligence::policies::PolicyDecision {
+        crate::intelligence::policies::PolicyDecision {
+            policy_name: policy_name.to_string(),
+            action_type: self.action_type.as_str().to_string(),
+            tool: self.tool.clone(),
+            score: self.score,
+            priority_adjustment: 0.0,
+            reasons: self.policy_reasons.clone(),
+            evidence_refs: self.evidence_refs.clone(),
+        }
+    }
+
     pub fn stop(reason: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -180,6 +207,8 @@ impl PlannedAction {
             cost: 0.0,
             risk: 0.0,
             context: HashMap::new(),
+            policy_reasons: Vec::new(),
+            evidence_refs: Vec::new(),
         }
     }
 

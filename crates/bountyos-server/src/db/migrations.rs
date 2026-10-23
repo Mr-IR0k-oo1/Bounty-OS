@@ -1,98 +1,82 @@
 pub const MIGRATIONS: &[(&str, &str)] = &[
-    ("001_hunters", include_str!("migrations/001_hunters.sql")),
-    ("002_projects", include_str!("migrations/002_projects.sql")),
-    ("003_programs", include_str!("migrations/003_programs.sql")),
-    ("004_scope", include_str!("migrations/004_scope.sql")),
     (
-        "005_subdomains",
-        include_str!("migrations/005_subdomains.sql"),
+        "001_initial_schema",
+        include_str!("migrations/001_initial_schema.sql"),
     ),
     (
-        "006_ports_urls",
-        include_str!("migrations/006_ports_urls.sql"),
-    ),
-    ("007_findings", include_str!("migrations/007_findings.sql")),
-    ("008_jobs", include_str!("migrations/008_jobs.sql")),
-    ("009_alerts", include_str!("migrations/009_alerts.sql")),
-    ("010_tokens", include_str!("migrations/010_tokens.sql")),
-    ("011_audit", include_str!("migrations/011_audit.sql")),
-    (
-        "012_llm_triage",
-        include_str!("migrations/012_llm_triage.sql"),
+        "002_evidence_and_hashes",
+        include_str!("migrations/002_evidence_and_hashes.sql"),
     ),
     (
-        "013_investigation_actions",
-        include_str!("migrations/013_investigation_actions.sql"),
+        "003_audit_log",
+        include_str!("migrations/003_audit_log.sql"),
     ),
     (
-        "014_action_outcomes",
-        include_str!("migrations/014_action_outcomes.sql"),
+        "004_findings_and_scans",
+        include_str!("migrations/004_findings_and_scans.sql"),
     ),
     (
-        "015_security_hypotheses",
-        include_str!("migrations/015_security_hypotheses.sql"),
+        "005_investigation_state",
+        include_str!("migrations/005_investigation_state.sql"),
+    ),
+    (
+        "006_verification_runs",
+        include_str!("migrations/006_verification_runs.sql"),
+    ),
+    (
+        "007_vulnllm_triage",
+        include_str!("migrations/007_vulnllm_triage.sql"),
+    ),
+    (
+        "008_mcp_control_plane",
+        include_str!("migrations/008_mcp_control_plane.sql"),
     ),
     (
         "016_global_experience",
         include_str!("migrations/016_global_experience.sql"),
     ),
+    (
+        "017_target_profiles",
+        include_str!("migrations/017_target_profiles.sql"),
+    ),
 ];
 
 pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "CREATE TABLE IF NOT EXISTS sqlx_migrations (
-            version BIGINT PRIMARY KEY,
-            description TEXT NOT NULL,
-            installed_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            success BOOLEAN NOT NULL DEFAULT TRUE,
-            checksum BYTEA NOT NULL DEFAULT ''::bytea,
-            execution_time BIGINT NOT NULL DEFAULT 0
-        );",
+        r#"
+        CREATE TABLE IF NOT EXISTS _migrations (
+            name VARCHAR(255) PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        "#,
     )
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS schema_migrations (
-            version INTEGER PRIMARY KEY,
-            applied_at TIMESTAMPTZ DEFAULT NOW()
-        );",
-    )
-    .execute(pool)
-    .await?;
-
-    for (i, (description, sql)) in MIGRATIONS.iter().enumerate() {
-        let version = (i + 1) as i64;
-        let applied: Option<i64> =
-            sqlx::query_scalar("SELECT version FROM sqlx_migrations WHERE version = $1")
-                .bind(version)
-                .fetch_optional(pool)
+    for (name, sql) in MIGRATIONS {
+        let applied: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM _migrations WHERE name = $1)")
+                .bind(name)
+                .fetch_one(pool)
                 .await?;
 
-        if applied.is_none() {
-            tracing::info!("Running migration {}: {}", version, description);
-            use sqlx::Executor;
-            let start = std::time::Instant::now();
-            pool.execute(*sql).await?;
-            let elapsed_ms = start.elapsed().as_millis() as i64;
-
-            sqlx::query(
-                "INSERT INTO sqlx_migrations (version, description, execution_time) VALUES ($1, $2, $3)",
-            )
-            .bind(version)
-            .bind(description)
-            .bind(elapsed_ms)
-            .execute(pool)
-            .await?;
-
-            sqlx::query(
-                "INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING",
-            )
-            .bind(version as i32)
-            .execute(pool)
-            .await?;
+        if !applied {
+            tracing::info!("Applying migration: {}", name);
+            let mut tx = pool.begin().await?;
+            for statement in sql.split(';') {
+                let trimmed = statement.trim();
+                if !trimmed.is_empty() {
+                    sqlx::query(trimmed).execute(&mut *tx).await?;
+                }
+            }
+            sqlx::query("INSERT INTO _migrations (name) VALUES ($1)")
+                .bind(name)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            tracing::info!("Applied migration: {}", name);
         }
     }
-    tracing::info!("All migrations completed successfully");
+
     Ok(())
 }

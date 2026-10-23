@@ -13,6 +13,8 @@ pub mod graph;
 pub mod llm;
 pub mod observations;
 pub mod planner;
+pub mod policies;
+pub mod profiler;
 pub mod runner;
 pub mod scoring;
 pub mod state;
@@ -25,6 +27,8 @@ pub use actions::{ActionType, PlannedAction};
 pub use graph::AttackSurfaceGraph;
 pub use observations::{IngestionMetrics, Observation, ObservationIngestion};
 pub use planner::{IntelligencePlanner, InvestigationPlan};
+pub use policies::{InvestigationPolicy, PolicyDecision, PolicyRegistry};
+pub use profiler::TargetProfiler;
 pub use runner::{
     list_investigation_actions, save_investigation_action, AutonomousInvestigationRunner,
     InvestigationRunSummary, RunInvestigationRequest, StateSummary,

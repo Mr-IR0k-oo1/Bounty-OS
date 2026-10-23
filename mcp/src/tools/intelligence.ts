@@ -227,4 +227,73 @@ export function registerIntelligenceTools(server: McpServer, client: BountyOSCli
       }
     }
   );
+
+  // 7. investigation.profile (v0.7)
+  server.tool(
+    "investigation.profile",
+    "Retrieve the normalized target attack-surface profile (technologies, services, auth state, indicators, and confidence) derived from observed evidence.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      try {
+        const profile = await client.getInvestigationProfile(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.profile",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(profile);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to retrieve target profile: ${e.message}`
+        );
+      }
+    }
+  );
+
+  // 8. investigation.policy (v0.7)
+  server.tool(
+    "investigation.policy",
+    "Retrieve the active target-specific investigation policy, candidate action prioritizations, and self-explaining decision provenance.",
+    {
+      investigation_id: z.string().describe("The UUID of the investigation"),
+    },
+    async ({ investigation_id }) => {
+      const startTime = Date.now();
+      const requestId = McpLogger.createRequestId();
+
+      try {
+        const policy = await client.getInvestigationPolicy(investigation_id);
+
+        McpLogger.logOperation({
+          request_id: requestId,
+          actor: "agent",
+          tool: "investigation.policy",
+          arguments: { investigation_id },
+          investigation_id,
+          duration_ms: Date.now() - startTime,
+          result: "SUCCESS",
+        });
+
+        return mcpSuccessResponse(policy);
+      } catch (e: any) {
+        return mcpErrorResponse(
+          McpErrorCode.INTERNAL_ERROR,
+          `Failed to retrieve investigation policy: ${e.message}`
+        );
+      }
+    }
+  );
 }
+
