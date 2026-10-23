@@ -15,6 +15,8 @@
 
 ---
 
+> 📖 **System Manifesto**: For an in-depth dive into the formal decision engine, relational attack surface graph (ASG v0.2), deterministic replay proofs, safety boundaries, and latency benchmarks, see [**High-Level Architecture & System Manifesto**](HIGH_LEVEL_README.md).
+
 ## 🎯 Overview
 
 **Bounty OS** is an open-source, autonomous intelligence operating platform for security teams and bug bounty hunters. Unlike traditional static recon wrappers that fire indiscriminate scans, Bounty OS treats security assessments as an **adaptive decision process**:
