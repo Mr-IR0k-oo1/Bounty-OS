@@ -1095,3 +1095,92 @@ pub async fn list_investigation_decisions(
         .collect();
     Ok(Json(list))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct RecordRelationshipRequest {
+    pub source_type: String,
+    pub source_id: String,
+    pub source_label: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub target_label: String,
+    pub relationship_type: String,
+    pub source_tool: String,
+    #[serde(default)]
+    pub job_id: Option<Uuid>,
+    #[serde(default = "default_relationship_confidence")]
+    pub confidence: f32,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+fn default_relationship_confidence() -> f32 {
+    1.0
+}
+
+/// Handler for GET /api/investigations/:id/graph
+pub async fn get_attack_surface_graph(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::models::attack_surface::AttackSurfaceGraph>, (StatusCode, Json<serde_json::Value>)> {
+    let graph = crate::intelligence::attack_surface::AttackSurfaceEngine::build_graph(&app_state, id).await;
+    Ok(Json(graph))
+}
+
+/// Handler for GET /api/investigations/:id/graph/summary
+pub async fn get_attack_surface_summary(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::models::attack_surface::AttackSurfaceSummary>, (StatusCode, Json<serde_json::Value>)> {
+    let graph = crate::intelligence::attack_surface::AttackSurfaceEngine::build_graph(&app_state, id).await;
+    Ok(Json(graph.summary))
+}
+
+/// Handler for GET /api/investigations/:id/graph/unexplored
+pub async fn get_attack_surface_unexplored(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::models::attack_surface::UnexploredSurface>>, (StatusCode, Json<serde_json::Value>)> {
+    let graph = crate::intelligence::attack_surface::AttackSurfaceEngine::build_graph(&app_state, id).await;
+    Ok(Json(graph.unexplored))
+}
+
+/// Handler for GET /api/investigations/:id/graph/relationships
+pub async fn list_attack_surface_relationships(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::models::attack_surface::AttackSurfaceRelationship>>, (StatusCode, Json<serde_json::Value>)> {
+    let rels = crate::models::attack_surface::list_relationships(&app_state, id).await;
+    Ok(Json(rels))
+}
+
+/// Handler for POST /api/investigations/:id/graph/relationships
+pub async fn record_attack_surface_relationship(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<RecordRelationshipRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    crate::intelligence::attack_surface::AttackSurfaceEngine::record_relationship(
+        &app_state,
+        id,
+        &payload.source_type,
+        &payload.source_id,
+        &payload.source_label,
+        &payload.target_type,
+        &payload.target_id,
+        &payload.target_label,
+        &payload.relationship_type,
+        &payload.source_tool,
+        payload.job_id,
+        payload.confidence,
+        payload.metadata.unwrap_or_else(|| serde_json::json!({})),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "status": "success",
+        "investigation_id": id,
+        "relationship_type": payload.relationship_type
+    })))
+}
+

@@ -34,6 +34,10 @@ pub struct AppState {
     in_memory_target_profiles: Arc<tokio::sync::RwLock<Vec<crate::models::target_profile::TargetProfile>>>,
     in_memory_planner_decisions: Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::PlannerDecision>>>,
     in_memory_action_executions: Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::ActionExecution>>>,
+    in_memory_attack_surface_relationships: Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::AttackSurfaceRelationship>>>,
+    in_memory_dns_records: Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::DnsRecord>>>,
+    in_memory_http_services: Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::HttpService>>>,
+    in_memory_endpoint_parameters: Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::EndpointParameter>>>,
 }
 
 impl AppState {
@@ -61,6 +65,10 @@ impl AppState {
         let in_memory_target_profiles = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_planner_decisions = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_action_executions = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_attack_surface_relationships = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_dns_records = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_http_services = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_endpoint_parameters = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         Self {
             db_pool,
             redis_pool,
@@ -84,6 +92,10 @@ impl AppState {
             in_memory_target_profiles,
             in_memory_planner_decisions,
             in_memory_action_executions,
+            in_memory_attack_surface_relationships,
+            in_memory_dns_records,
+            in_memory_http_services,
+            in_memory_endpoint_parameters,
         }
     }
 
@@ -659,6 +671,30 @@ impl AppState {
         &self,
     ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::ActionExecution>>> {
         &self.in_memory_action_executions
+    }
+
+    pub fn in_memory_attack_surface_relationships(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::AttackSurfaceRelationship>>> {
+        &self.in_memory_attack_surface_relationships
+    }
+
+    pub fn in_memory_dns_records(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::DnsRecord>>> {
+        &self.in_memory_dns_records
+    }
+
+    pub fn in_memory_http_services(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::HttpService>>> {
+        &self.in_memory_http_services
+    }
+
+    pub fn in_memory_endpoint_parameters(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::attack_surface::EndpointParameter>>> {
+        &self.in_memory_endpoint_parameters
     }
 
     pub fn db(&self) -> &PgPool {

@@ -14,3 +14,4 @@ pub mod subdomain;
 pub mod target_profile;
 pub mod url;
 pub mod planner_decision;
+pub mod attack_surface;

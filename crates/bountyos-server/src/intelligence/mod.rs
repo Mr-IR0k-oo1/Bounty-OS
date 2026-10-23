@@ -7,6 +7,7 @@ pub mod action_value;
 pub mod actions;
 pub mod adaptive_planner;
 pub mod archetype;
+pub mod attack_surface;
 pub mod authz;
 pub mod behavior;
 pub mod budgets;
@@ -35,6 +36,7 @@ pub use adaptive_planner::{
     AdaptivePlan, AdaptivePlanner, AdaptiveScorer, PlannerActionDef, PlannerCapability,
     PlannerScoreComponents, PreconditionEngine, RedundancyEngine, RejectedCandidate,
 };
+pub use attack_surface::AttackSurfaceEngine;
 pub use authz::{AuthzEngine, Identity, AuthorizationBoundary};
 pub use behavior::{BehaviorAnalyzer, BehaviorReport, WafVendor};
 pub use education::{EducationEngine, EducationLesson};

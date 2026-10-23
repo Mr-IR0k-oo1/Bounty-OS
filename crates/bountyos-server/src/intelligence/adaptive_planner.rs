@@ -819,6 +819,34 @@ impl AdaptiveScorer {
             reason = format!("{}; prior execution failed, penalized to prioritize alternative actions", reason);
         }
 
+        // 4. Graph-driven unexplored surface boost:
+        // Prioritize candidates targeting unexplored portions of the attack surface graph.
+        match capability {
+            PlannerCapability::InvestigateXSS => {
+                if state.endpoints.iter().any(|e| e.has_reflected_parameters()) {
+                    info_gain += 10.0;
+                    finding_potential += 8.0;
+                    reason = format!("{}; attack surface graph highlights unexplored reflected parameter", reason);
+                }
+            }
+            PlannerCapability::CrawlApplication => {
+                let has_unexplored_web = state.services.iter().any(|s| s.http_probed && state.endpoints.is_empty());
+                if has_unexplored_web {
+                    info_gain += 12.0;
+                    target_relevance += 8.0;
+                    reason = format!("{}; attack surface graph highlights unexplored live HTTP service", reason);
+                }
+            }
+            PlannerCapability::ResolveDNS => {
+                let has_unresolved = state.subdomains.iter().any(|s| !s.dns_resolved);
+                if has_unresolved {
+                    info_gain += 10.0;
+                    reason = format!("{}; attack surface graph highlights unexplored unmapped subdomains", reason);
+                }
+            }
+            _ => {}
+        }
+
         let components = PlannerScoreComponents {
             information_gain: info_gain,
             finding_potential,

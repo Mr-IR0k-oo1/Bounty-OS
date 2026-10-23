@@ -199,6 +199,23 @@ pub fn create_router(
         .route(
             "/investigations/:id/decisions",
             get(crate::handlers::intelligence::list_investigation_decisions),
+        )
+        .route(
+            "/investigations/:id/graph",
+            get(crate::handlers::intelligence::get_attack_surface_graph),
+        )
+        .route(
+            "/investigations/:id/graph/summary",
+            get(crate::handlers::intelligence::get_attack_surface_summary),
+        )
+        .route(
+            "/investigations/:id/graph/unexplored",
+            get(crate::handlers::intelligence::get_attack_surface_unexplored),
+        )
+        .route(
+            "/investigations/:id/graph/relationships",
+            get(crate::handlers::intelligence::list_attack_surface_relationships)
+                .post(crate::handlers::intelligence::record_attack_surface_relationship),
         );
 
     // Protected routes (require valid JWT access token)
