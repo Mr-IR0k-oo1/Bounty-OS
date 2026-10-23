@@ -31,6 +31,12 @@ vulnllm-client/
 # Logs
 logs/
 *.log
+.overnight-logs/
+
+# Test and benchmark run outputs
+scripts/*_proof.json
+scripts/*_results.json
+scripts/benchmark_*.json
 
 # IDE
 .vscode/
