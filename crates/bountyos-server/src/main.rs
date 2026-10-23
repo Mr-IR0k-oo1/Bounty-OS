@@ -36,11 +36,25 @@ async fn main() {
     // Load configuration
     let config = config::load_config().expect("Failed to load configuration");
 
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "migrate" {
+        tracing::info!("Running Diesel migrations via CLI...");
+        let db_pool = db::init_db_pool(&config.database_url)
+            .await
+            .expect("Failed to connect to database for migration");
+        if let Err(e) = db::migrations::run_migrations(&config.database_url, &db_pool).await {
+            tracing::error!("Failed to run database migrations: {:?}", e);
+            std::process::exit(1);
+        }
+        tracing::info!("Diesel migrations completed successfully.");
+        return;
+    }
+
     // Connect PostgreSQL
     let (db_pool, has_db) = match db::init_db_pool(&config.database_url).await {
         Ok(pool) => {
             tracing::info!("Connected to PostgreSQL database");
-            if let Err(e) = db::migrations::run_migrations(&pool).await {
+            if let Err(e) = db::migrations::run_migrations(&config.database_url, &pool).await {
                 tracing::warn!("Failed to run database migrations: {:?}. Proceeding.", e);
             }
             if let Err(e) = db::seed_defaults_if_empty(&pool).await {

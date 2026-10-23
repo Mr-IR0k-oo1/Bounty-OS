@@ -1,0 +1,8 @@
+# Diesel CLI configuration for Bounty OS
+# Documentation: https://diesel.rs/guides/configuring-diesel-cli.html
+
+[print_schema]
+file = "crates/bountyos-server/src/db/schema.rs"
+
+[migrations_directory]
+dir = "migrations"

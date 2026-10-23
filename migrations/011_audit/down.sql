@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS session_blacklist CASCADE;
+DROP TABLE IF EXISTS audit_log CASCADE;

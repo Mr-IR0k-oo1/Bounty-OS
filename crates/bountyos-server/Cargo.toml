@@ -16,6 +16,8 @@ argon2 = "0.5"
 totp-rs = { version = "5.0", features = ["gen_secret", "otpauth"] }
 redis = { version = "0.24", features = ["tokio-comp"] }
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "uuid", "json", "chrono", "migrate"] }
+diesel = { version = "2.2", default-features = false, features = ["postgres", "chrono", "uuid", "r2d2"] }
+diesel_migrations = { version = "2.2", default-features = false, features = ["postgres"] }
 reqwest = { version = "0.11", features = ["json"] }
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
