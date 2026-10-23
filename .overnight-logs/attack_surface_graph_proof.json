@@ -1,0 +1,86 @@
+{
+  "test_suite": "Bounty OS Attack Surface Graph v0.2",
+  "timestamp": "2026-10-23T11:49:41.235Z",
+  "passed": 13,
+  "failed": 0,
+  "tests": [
+    {
+      "title": "Backend server connectivity",
+      "pass": true,
+      "detail": "HTTP 200",
+      "timestamp": "2026-10-23T11:49:41.255Z"
+    },
+    {
+      "title": "Admin authentication",
+      "pass": true,
+      "detail": "Bearer token acquired",
+      "timestamp": "2026-10-23T11:49:41.429Z"
+    },
+    {
+      "title": "Target investigation resolution",
+      "pass": true,
+      "detail": "ID: 3f882f2b-72b6-4e98-9d07-39bc4cd4846a (Local Lab Adaptive Investigation 1792749577131)",
+      "timestamp": "2026-10-23T11:49:41.435Z"
+    },
+    {
+      "title": "Graph relationship ingestion with provenance",
+      "pass": true,
+      "detail": "source: katana, relationship: hosts_endpoint",
+      "timestamp": "2026-10-23T11:49:41.443Z"
+    },
+    {
+      "title": "Query graph provenance relationships",
+      "pass": true,
+      "detail": "Retrieved 1 relationship edges with provenance",
+      "timestamp": "2026-10-23T11:49:41.451Z"
+    },
+    {
+      "title": "Attack surface summary metrics",
+      "pass": true,
+      "detail": "Targets: 1, Assets: 1, Endpoints: 1, Unexplored: 1",
+      "timestamp": "2026-10-23T11:49:41.484Z"
+    },
+    {
+      "title": "Graph-backed attack surface model projection",
+      "pass": true,
+      "detail": "Projected 5 nodes and 4 edges",
+      "timestamp": "2026-10-23T11:49:41.491Z"
+    },
+    {
+      "title": "Identify unexplored attack surface opportunities",
+      "pass": true,
+      "detail": "Found 3 unexplored nodes (top priority: investigate_xss on http://lab-target:8888/search?q=test&category=sec)",
+      "timestamp": "2026-10-23T11:49:41.495Z"
+    },
+    {
+      "title": "Adaptive planner action selection driven by unexplored surface",
+      "pass": true,
+      "detail": "Selected: discover_parameters (arjun) targeting http://lab-target:8888 [Score: 70.0]",
+      "timestamp": "2026-10-23T11:49:41.508Z"
+    },
+    {
+      "title": "Execute tool action and record empirical delta",
+      "pass": true,
+      "detail": "Execution ID: e7e88bb5-b923-4f65-a75e-145f8582c86a",
+      "timestamp": "2026-10-23T11:49:41.515Z"
+    },
+    {
+      "title": "Graph state update with newly discovered evidence",
+      "pass": true,
+      "detail": "Finding registered on attack surface",
+      "timestamp": "2026-10-23T11:49:41.529Z"
+    },
+    {
+      "title": "Attack surface graph evolves with confirmed findings",
+      "pass": true,
+      "detail": "Graph updated to 6 nodes (Finding node attached)",
+      "timestamp": "2026-10-23T11:49:41.548Z"
+    },
+    {
+      "title": "Closed-loop decision adaptation: Planner prioritizes alternative unexplored surface",
+      "pass": true,
+      "detail": "Previous: discover_parameters:arjun:http://lab-target:8888 on http://lab-target:8888 -> Next: verify_finding:deterministic_verifier:http://lab-target:8888 on http://lab-target:8888",
+      "timestamp": "2026-10-23T11:49:41.560Z"
+    }
+  ]
+}

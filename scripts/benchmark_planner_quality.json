@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-10-23T09:59:14.395Z",
+  "timestamp": "2026-10-23T11:52:21.433Z",
   "verdict": "PASSED",
   "baseline": {
     "strategy": "deterministic_baseline",
     "runIndex": 1,
-    "programId": "8668de67-05b6-45a0-8f53-04d305351647",
+    "programId": "48b717fd-160f-4fc5-a753-d49d8359c6e9",
     "toolExecutions": 10,
     "duplicateExecutions": 2,
     "uniqueAssets": 10,
@@ -13,17 +13,17 @@
     "findings": 1,
     "confirmedFindings": 1,
     "falsePositives": 0,
-    "failedActions": 4,
+    "failedActions": 5,
     "averageActionScore": 35,
-    "durationMs": 74848,
-    "durationSec": 74.85,
-    "cpuUsage": "2.25%",
-    "ramUsage": "46.29MiB"
+    "durationMs": 88917,
+    "durationSec": 88.92,
+    "cpuUsage": "0.04%",
+    "ramUsage": "44.36MiB"
   },
   "adaptive": {
     "strategy": "adaptive_planner",
     "runIndex": 1,
-    "programId": "d70b45cb-f2b4-44dc-81f9-312018dbf965",
+    "programId": "6feba655-faf4-44ae-8a1b-52405e637aba",
     "toolExecutions": 6,
     "duplicateExecutions": 0,
     "uniqueAssets": 1,
@@ -33,16 +33,16 @@
     "confirmedFindings": 1,
     "falsePositives": 0,
     "failedActions": 0,
-    "averageActionScore": 81.3,
-    "durationMs": 16647,
-    "durationSec": 16.65,
-    "cpuUsage": "0%",
-    "ramUsage": "43.63MiB"
+    "averageActionScore": 84.7,
+    "durationMs": 16612,
+    "durationSec": 16.61,
+    "cpuUsage": "0.04%",
+    "ramUsage": "42.71MiB"
   },
   "delta": {
     "tool_execution_reduction_percent": 40,
     "duplicate_actions_eliminated": 2,
-    "duration_reduction_percent": 77.8,
-    "average_score_improvement": 46.3
+    "duration_reduction_percent": 81.3,
+    "average_score_improvement": 49.7
   }
 }
