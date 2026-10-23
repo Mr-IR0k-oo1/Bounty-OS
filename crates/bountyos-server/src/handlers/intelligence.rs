@@ -1063,5 +1063,35 @@ pub async fn record_execution(
     })))
 }
 
-
-
+/// Handler for GET /api/investigations/:id/decisions
+pub async fn list_investigation_decisions(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<serde_json::Value>>, (StatusCode, Json<serde_json::Value>)> {
+    let decisions = crate::models::planner_decision::list_planner_decisions(&app_state, id).await;
+    let list: Vec<serde_json::Value> = decisions
+        .into_iter()
+        .enumerate()
+        .map(|(idx, d)| {
+            json!({
+                "decision_id": d.id,
+                "investigation_id": d.investigation_id,
+                "state_version": idx + 1,
+                "selected_action": d.selected_action,
+                "capability": d.capability,
+                "target": d.target,
+                "tool": d.tool,
+                "score": d.score,
+                "score_components": d.score_components,
+                "reason": d.reason,
+                "expected_information_gain": d.expected_information_gain,
+                "estimated_cost": d.estimated_cost,
+                "alternatives": d.alternatives,
+                "rejected_candidates": d.rejected_candidates,
+                "target_archetype": d.target_archetype,
+                "created_at": d.created_at,
+            })
+        })
+        .collect();
+    Ok(Json(list))
+}

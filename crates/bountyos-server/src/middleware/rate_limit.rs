@@ -17,8 +17,8 @@ pub fn rate_limit_layer() -> GovernorLayer<'static, PeerIpKeyExtractor, NoOpMidd
 pub fn login_rate_limit_layer() -> GovernorLayer<'static, PeerIpKeyExtractor, NoOpMiddleware> {
     let config = Box::leak(Box::new(
         GovernorConfigBuilder::default()
-            .per_second(180)
-            .burst_size(5)
+            .per_second(2)
+            .burst_size(50)
             .finish()
             .unwrap(),
     ));

@@ -195,6 +195,10 @@ pub fn create_router(
         .route(
             "/investigations/:id/executions",
             post(crate::handlers::intelligence::record_execution),
+        )
+        .route(
+            "/investigations/:id/decisions",
+            get(crate::handlers::intelligence::list_investigation_decisions),
         );
 
     // Protected routes (require valid JWT access token)

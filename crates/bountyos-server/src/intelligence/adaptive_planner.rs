@@ -272,22 +272,21 @@ impl PreconditionEngine {
                 Ok(())
             }
             PlannerCapability::AnalyzeJavaScript => {
-                let has_js = state.endpoints.iter().any(|e| e.path.ends_with(".js"))
-                    || state.services.iter().any(|s| s.http_probed);
+                let has_js = state.endpoints.iter().any(|e| e.path.ends_with(".js"));
                 if !has_js {
                     return Err((
-                        "No JavaScript assets or web application discovered".to_string(),
-                        "JavaScript assets or web application".to_string(),
+                        "No JavaScript assets discovered on target to analyze".to_string(),
+                        "JavaScript (.js) endpoint assets".to_string(),
                     ));
                 }
                 Ok(())
             }
             PlannerCapability::SearchSecrets => {
-                let has_content = !state.endpoints.is_empty() || state.services.iter().any(|s| s.http_probed);
+                let has_content = !state.endpoints.is_empty();
                 if !has_content {
                     return Err((
                         "No crawled endpoints or content assets to inspect for secrets".to_string(),
-                        "Endpoint content or JavaScript files".to_string(),
+                        "Crawled application endpoints".to_string(),
                     ));
                 }
                 Ok(())
@@ -425,10 +424,11 @@ impl PreconditionEngine {
             }
             PlannerCapability::GenerateThreatModel => {
                 let has_surface = !state.hosts.is_empty() || !state.endpoints.is_empty() || !state.services.is_empty();
-                if !has_surface {
+                let has_active_testing = state.executed_actions.iter().any(|a| a.action_type.contains("crawl") || a.action_type.contains("xss") || a.action_type.contains("probe") || a.tool == "katana" || a.tool == "httpx");
+                if !has_surface || !has_active_testing {
                     return Err((
-                        "No attack surface discovered yet to synthesize a threat model".to_string(),
-                        "Attack surface hosts or services".to_string(),
+                        "Requires active crawling or live service probing prior to synthesizing threat model".to_string(),
+                        "Active application crawl or probe".to_string(),
                     ));
                 }
                 Ok(())
@@ -461,7 +461,13 @@ impl RedundancyEngine {
         let matching_executions: Vec<_> = state
             .executed_actions
             .iter()
-            .filter(|a| a.tool == tool && a.target == target)
+            .filter(|a| {
+                a.tool == tool
+                    && (a.target == target
+                        || a.target.contains(target)
+                        || target.contains(&a.target)
+                        || a.action_type == capability.as_str())
+            })
             .collect();
 
         if matching_executions.is_empty() {
@@ -484,10 +490,10 @@ impl RedundancyEngine {
             );
         }
 
-        // Action exhausted without new evidence
+        // Action exhausted without new evidence: immediate complete redundancy to suppress duplicate executions
         let count = matching_executions.len();
-        let penalty = (count as f64 * 12.0).min(30.0);
-        let is_completely_redundant = count >= 2;
+        let penalty = (count as f64 * 15.0).min(35.0);
+        let is_completely_redundant = count >= 1;
 
         (
             is_completely_redundant,
@@ -741,6 +747,76 @@ impl AdaptiveScorer {
                 risk_penalty = 0.0;
                 reason = "Investigation stopping condition reached".to_string();
             }
+        }
+
+        // --- EMPIRICAL FEEDBACK LOOP RULES ---
+        // 1. Technology + parameterized endpoint affinity:
+        // Backends (PHP, WordPress, Node, Express, Python) with parameterized inputs
+        // historically yield higher vulnerability rates.
+        let has_backend_tech = state.technologies.iter().any(|t| {
+            let n = t.name.to_lowercase();
+            n.contains("php")
+                || n.contains("wordpress")
+                || n.contains("node")
+                || n.contains("express")
+                || n.contains("python")
+                || n.contains("flask")
+                || n.contains("django")
+        });
+        let has_parameters = state.endpoints.iter().any(|e| !e.params.is_empty());
+
+        if has_backend_tech && has_parameters {
+            match capability {
+                PlannerCapability::InvestigateXSS => {
+                    finding_potential += 6.0;
+                    target_relevance += 4.0;
+                    reason = format!("{}; backend technology & parameterized input surface statistically increases XSS yield", reason);
+                }
+                PlannerCapability::InvestigateSQLi => {
+                    finding_potential += 6.0;
+                    target_relevance += 4.0;
+                    reason = format!("{}; backend technology & query parameters statistically increases SQLi yield", reason);
+                }
+                _ => {}
+            }
+        }
+
+        // 2. Static asset / zero yield penalty:
+        // Directory fuzzing and parameter discovery on static assets (.png, .css, .ico, etc.)
+        // have repeatedly zero yield.
+        let is_static_asset = target.ends_with(".png")
+            || target.ends_with(".jpg")
+            || target.ends_with(".jpeg")
+            || target.ends_with(".css")
+            || target.ends_with(".ico")
+            || target.ends_with(".svg")
+            || target.ends_with(".woff")
+            || target.ends_with(".woff2");
+
+        if is_static_asset {
+            match capability {
+                PlannerCapability::DiscoverDirectories | PlannerCapability::DiscoverParameters => {
+                    finding_potential = if finding_potential > 10.0 { finding_potential - 10.0 } else { 0.0 };
+                    execution_cost += 6.0;
+                    risk_penalty += 4.0;
+                    reason = format!("{}; static asset target historically has zero yield, priority decreased", reason);
+                }
+                _ => {}
+            }
+        }
+
+        // 3. Failed execution outcome penalty:
+        // If a prior execution of this tool on this target failed, penalize to prioritize
+        // alternate candidate attack vectors.
+        let prior_failure = state
+            .executed_actions
+            .iter()
+            .any(|a| a.tool == tool && a.target == target && !a.success);
+
+        if prior_failure {
+            execution_cost += 8.0;
+            risk_penalty += 8.0;
+            reason = format!("{}; prior execution failed, penalized to prioritize alternative actions", reason);
         }
 
         let components = PlannerScoreComponents {

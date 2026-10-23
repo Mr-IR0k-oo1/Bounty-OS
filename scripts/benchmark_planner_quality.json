@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-10-23T09:59:14.395Z",
+  "verdict": "PASSED",
+  "baseline": {
+    "strategy": "deterministic_baseline",
+    "runIndex": 1,
+    "programId": "8668de67-05b6-45a0-8f53-04d305351647",
+    "toolExecutions": 10,
+    "duplicateExecutions": 2,
+    "uniqueAssets": 10,
+    "uniqueEndpoints": 4,
+    "uniqueParameters": 2,
+    "findings": 1,
+    "confirmedFindings": 1,
+    "falsePositives": 0,
+    "failedActions": 4,
+    "averageActionScore": 35,
+    "durationMs": 74848,
+    "durationSec": 74.85,
+    "cpuUsage": "2.25%",
+    "ramUsage": "46.29MiB"
+  },
+  "adaptive": {
+    "strategy": "adaptive_planner",
+    "runIndex": 1,
+    "programId": "d70b45cb-f2b4-44dc-81f9-312018dbf965",
+    "toolExecutions": 6,
+    "duplicateExecutions": 0,
+    "uniqueAssets": 1,
+    "uniqueEndpoints": 4,
+    "uniqueParameters": 2,
+    "findings": 1,
+    "confirmedFindings": 1,
+    "falsePositives": 0,
+    "failedActions": 0,
+    "averageActionScore": 81.3,
+    "durationMs": 16647,
+    "durationSec": 16.65,
+    "cpuUsage": "0%",
+    "ramUsage": "43.63MiB"
+  },
+  "delta": {
+    "tool_execution_reduction_percent": 40,
+    "duplicate_actions_eliminated": 2,
+    "duration_reduction_percent": 77.8,
+    "average_score_improvement": 46.3
+  }
+}

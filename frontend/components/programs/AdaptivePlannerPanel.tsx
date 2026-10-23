@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { 
   Sparkles, RefreshCw, CheckCircle2, ShieldAlert, Cpu, 
-  ArrowRight, Activity, Globe, Bug, ChevronRight, Layers, HelpCircle, AlertTriangle
+  ArrowRight, Activity, Globe, Bug, ChevronRight, Layers, HelpCircle, AlertTriangle,
+  History, Clock
 } from "lucide-react"
 
 interface AdaptivePlannerPanelProps {
@@ -17,8 +18,10 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
   const [loading, setLoading] = useState(true)
   const [replanning, setReplanning] = useState(false)
   const [plan, setPlan] = useState<any>(null)
+  const [decisions, setDecisions] = useState<any[]>([])
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [showRejected, setShowRejected] = useState(false)
+  const [showHistory, setShowHistory] = useState(true)
 
   const fetchPlan = async () => {
     try {
@@ -26,6 +29,11 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
       if (res.ok) {
         const data = await res.json()
         setPlan(data)
+      }
+      const decRes = await fetch(`/api/investigations/${programId}/decisions`)
+      if (decRes.ok) {
+        const decData = await decRes.json()
+        setDecisions(Array.isArray(decData) ? decData : [])
       }
     } catch (e) {
       console.error("Failed to fetch adaptive plan", e)
@@ -46,6 +54,11 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
       if (res.ok) {
         const data = await res.json()
         setPlan(data)
+      }
+      const decRes = await fetch(`/api/investigations/${programId}/decisions`)
+      if (decRes.ok) {
+        const decData = await decRes.json()
+        setDecisions(Array.isArray(decData) ? decData : [])
       }
     } catch (e) {
       console.error("Failed to replan", e)
@@ -362,6 +375,102 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
           )}
         </div>
       )}
+
+      {/* PLANNER DECISION HISTORY & AUDIT TRAIL */}
+      <div className="space-y-3 pt-2 border-t border-border/50">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5 text-primary" />
+            <span>Decision Provenance & Audit Trail ({decisions.length})</span>
+          </div>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-xs text-text-muted hover:text-text-secondary flex items-center gap-1 transition-colors"
+          >
+            <span>{showHistory ? "Hide History" : "Show History"}</span>
+            <ChevronRight className={`w-3 h-3 transition-transform ${showHistory ? "rotate-90" : ""}`} />
+          </button>
+        </div>
+
+        {showHistory && (
+          <div className="space-y-2.5">
+            {decisions.length === 0 ? (
+              <div className="p-4 bg-bg-card/40 rounded-xl border border-border/50 text-center text-xs text-text-muted">
+                No decisions recorded for this investigation yet. Run an investigation cycle or click &quot;Replan Now&quot;.
+              </div>
+            ) : (
+              decisions.map((dec: any, idx: number) => {
+                const alts = Array.isArray(dec.alternatives) ? dec.alternatives : []
+                return (
+                  <div
+                    key={dec.decision_id || idx}
+                    className="p-3.5 bg-bg-card border border-border rounded-xl space-y-2 hover:border-border-hover transition-colors text-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="badge bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold">
+                          v{dec.state_version ?? (decisions.length - idx)}
+                        </span>
+                        <span className="font-bold text-text-primary text-sm">
+                          {dec.selected_action}
+                        </span>
+                        <span className="badge bg-bg-overlay border border-border text-[9px] text-text-secondary">
+                          {dec.tool}
+                        </span>
+                        <span className="text-text-muted text-[11px] truncate max-w-[200px]">
+                          {dec.target}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="font-bold text-primary text-sm">{dec.score}</span>
+                          <span className="text-[10px] text-text-muted ml-1">pts</span>
+                        </div>
+                        <span className="text-[10px] text-text-muted flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {dec.created_at ? new Date(dec.created_at).toLocaleTimeString() : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* WHY BOUNTY OS RAN THIS TOOL */}
+                    <div className="p-2.5 bg-bg-base/70 rounded-lg border border-border/60">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+                        Why Bounty OS Selected This Action:
+                      </div>
+                      <div className="text-text-primary text-[11px] leading-relaxed">
+                        {dec.reason}
+                      </div>
+                    </div>
+
+                    {/* ALTERNATIVES CONSIDERED */}
+                    {alts.length > 0 && (
+                      <div className="text-[11px] text-text-muted pt-1 flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-text-secondary text-[10px] uppercase">
+                          Alternatives:
+                        </span>
+                        {alts.slice(0, 3).map((alt: any, aIdx: number) => (
+                          <span
+                            key={aIdx}
+                            className="inline-flex items-center gap-1 bg-bg-overlay px-2 py-0.5 rounded text-[10px] border border-border/40"
+                          >
+                            <span className="text-text-secondary">
+                              {alt.action_id || alt.capability || alt.action}
+                            </span>
+                            <span className="text-primary font-semibold">
+                              ({alt.score} pts)
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

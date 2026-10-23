@@ -1,96 +1,96 @@
 {
-  "timestamp": "2026-10-21T16:36:19.220Z",
+  "timestamp": "2026-10-23T09:47:01.680Z",
   "concurrency": 3,
-  "totalDurationMs": 34701,
+  "totalDurationMs": 15375,
   "totalJobs": 9,
-  "avgQueueTimeMs": 2038.11,
-  "throughputInvestigationsPerMin": 5.19,
-  "jobThroughputPerMin": 15.56,
+  "avgQueueTimeMs": 1132.33,
+  "throughputInvestigationsPerMin": 11.71,
+  "jobThroughputPerMin": 35.12,
   "peakDbConns": 12,
   "allSucceeded": true,
   "results": [
     {
       "investigationIndex": 1,
-      "programId": "b9fdfb42-01db-4113-bbfd-7ed86668c4a3",
-      "durationMs": 30753,
+      "programId": "83bf6170-cc6e-4061-a857-9559e4676616",
+      "durationMs": 9322,
       "jobs": [
         {
           "tool": "httpx",
-          "queueTimeMs": 26,
-          "durationMs": 5896,
+          "queueTimeMs": 11,
+          "durationMs": 521,
           "status": "done"
         },
         {
           "tool": "katana",
-          "queueTimeMs": 4061,
-          "durationMs": 14384,
+          "queueTimeMs": 11,
+          "durationMs": 4721,
           "status": "done"
         },
         {
           "tool": "dalfox",
-          "queueTimeMs": 2035,
-          "durationMs": 4261,
+          "queueTimeMs": 2021,
+          "durationMs": 2019,
           "status": "done"
         }
       ],
       "findingsCount": 1,
-      "endpointsCount": 4,
+      "endpointsCount": 0,
       "success": true
     },
     {
       "investigationIndex": 2,
-      "programId": "da7a52b9-bb3f-49ad-9cb3-468f960c42e4",
-      "durationMs": 28519,
+      "programId": "b926fd68-8911-46f6-95df-963f58517bce",
+      "durationMs": 11336,
       "jobs": [
         {
           "tool": "httpx",
-          "queueTimeMs": 35,
-          "durationMs": 5877,
+          "queueTimeMs": 23,
+          "durationMs": 516,
           "status": "done"
         },
         {
           "tool": "katana",
-          "queueTimeMs": 2014,
-          "durationMs": 14400,
+          "queueTimeMs": 13,
+          "durationMs": 4710,
           "status": "done"
         },
         {
           "tool": "dalfox",
-          "queueTimeMs": 4067,
-          "durationMs": 2034,
+          "queueTimeMs": 4040,
+          "durationMs": 2013,
           "status": "done"
         }
       ],
       "findingsCount": 1,
-      "endpointsCount": 4,
+      "endpointsCount": 0,
       "success": true
     },
     {
       "investigationIndex": 3,
-      "programId": "825f1215-c8ca-4bbd-8f03-39a6e693a8cc",
-      "durationMs": 30743,
+      "programId": "f00eef19-ef48-46b6-b5b1-11e8f728d700",
+      "durationMs": 11335,
       "jobs": [
         {
           "tool": "httpx",
-          "queueTimeMs": 24,
-          "durationMs": 5896,
+          "queueTimeMs": 14,
+          "durationMs": 515,
           "status": "done"
         },
         {
           "tool": "katana",
-          "queueTimeMs": 2016,
-          "durationMs": 14405,
+          "queueTimeMs": 18,
+          "durationMs": 4715,
           "status": "done"
         },
         {
           "tool": "dalfox",
-          "queueTimeMs": 4065,
-          "durationMs": 4262,
+          "queueTimeMs": 4040,
+          "durationMs": 2013,
           "status": "done"
         }
       ],
       "findingsCount": 1,
-      "endpointsCount": 4,
+      "endpointsCount": 0,
       "success": true
     }
   ]
