@@ -706,3 +706,105 @@ pub async fn test_investigation_authz(
     })))
 }
 
+/// Handler for GET /api/investigations/:id/adaptive-plan
+pub async fn get_adaptive_plan(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::adaptive_planner::AdaptivePlan>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+
+    if let Some(ref action) = plan.selected_action {
+        let decision = crate::models::planner_decision::PlannerDecision {
+            id: Uuid::new_v4(),
+            investigation_id: id,
+            selected_action: action.action_id.clone(),
+            capability: action.capability.as_str().to_string(),
+            target: action.target.clone(),
+            tool: action.tool.clone(),
+            score: action.score,
+            score_components: serde_json::to_value(&action.score_components).unwrap_or_default(),
+            reason: action.reason.clone(),
+            expected_information_gain: action.expected_information_gain,
+            estimated_cost: action.estimated_cost.clone(),
+            alternatives: serde_json::to_value(&plan.alternatives).unwrap_or_default(),
+            rejected_candidates: serde_json::to_value(&plan.rejected_candidates).unwrap_or_default(),
+            target_archetype: plan.target_archetype.clone(),
+            created_at: chrono::Utc::now(),
+        };
+        crate::models::planner_decision::save_planner_decision(&app_state, &decision).await;
+    }
+
+    Ok(Json(plan))
+}
+
+/// Handler for GET /api/investigations/:id/next-action
+pub async fn get_next_action(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+
+    if let Some(action) = plan.selected_action {
+        Ok(Json(json!({
+            "investigation_id": id,
+            "action": action.action_id,
+            "capability": action.capability.as_str(),
+            "tool": action.tool,
+            "target": action.target,
+            "score": action.score,
+            "score_components": action.score_components,
+            "reason": action.reason,
+            "required_tools": action.required_tools,
+            "estimated_cost": action.estimated_cost,
+            "risk_level": action.risk_level,
+            "expected_information_gain": action.expected_information_gain,
+            "target_archetype": plan.target_archetype,
+        })))
+    } else {
+        Ok(Json(json!({
+            "investigation_id": id,
+            "action": "stop",
+            "score": 0.0,
+            "reason": plan.reason,
+            "stop_reason": plan.stop_reason,
+        })))
+    }
+}
+
+/// Handler for GET /api/investigations/:id/explain-decision
+pub async fn explain_decision(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let state = build_state_from_investigation(&app_state, id).await?;
+    let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
+    let latest_decision = crate::models::planner_decision::get_latest_planner_decision(&app_state, id).await;
+
+    Ok(Json(json!({
+        "investigation_id": id,
+        "current_plan": {
+            "selected_action": plan.selected_action,
+            "score": plan.score,
+            "score_components": plan.score_components,
+            "reason": plan.reason,
+            "target_archetype": plan.target_archetype,
+            "state_metrics": plan.state_metrics,
+            "alternatives": plan.alternatives,
+            "rejected_candidates": plan.rejected_candidates,
+        },
+        "persisted_decision": latest_decision,
+    })))
+}
+
+/// Handler for POST /api/investigations/:id/replan
+pub async fn replan_investigation(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::intelligence::adaptive_planner::AdaptivePlan>, (StatusCode, Json<serde_json::Value>)> {
+    get_adaptive_plan(State(app_state), Path(id)).await
+}
+
+
+

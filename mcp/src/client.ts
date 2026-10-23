@@ -656,6 +656,23 @@ export class BountyOSClient {
     });
   }
 
+  async getAdaptivePlan(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/adaptive-plan`);
+  }
+
+  async getNextAction(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/next-action`);
+  }
+
+  async explainDecision(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/explain-decision`);
+  }
+
+  async replanInvestigation(investigationId: string): Promise<any> {
+    return this.request<any>(`/investigations/${investigationId}/replan`, {
+      method: "POST",
+    });
+  }
 }
 
 export interface PlannedAction {

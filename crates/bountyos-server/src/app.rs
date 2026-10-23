@@ -175,6 +175,22 @@ pub fn create_router(
             "/investigations/:id/authz/test",
             post(crate::handlers::intelligence::test_investigation_authz),
         )
+        .route(
+            "/investigations/:id/adaptive-plan",
+            get(crate::handlers::intelligence::get_adaptive_plan)
+                .post(crate::handlers::intelligence::get_adaptive_plan),
+        )
+        .route(
+            "/investigations/:id/next-action",
+            get(crate::handlers::intelligence::get_next_action),
+        )
+        .route(
+            "/investigations/:id/explain-decision",
+            get(crate::handlers::intelligence::explain_decision),
+        )
+        .route(
+            "/investigations/:id/replan",
+            post(crate::handlers::intelligence::replan_investigation),
         );
 
     // Protected routes (require valid JWT access token)
