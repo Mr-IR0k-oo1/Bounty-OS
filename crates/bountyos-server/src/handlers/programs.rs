@@ -71,17 +71,22 @@ pub async fn create_program(
     Json(payload): Json<CreateProgramRequest>,
 ) -> Result<Json<Program>, StatusCode> {
     let created_by = user_id_ext.map(|axum::extract::Extension(id)| id);
-    let slug = payload.name.to_lowercase().replace(' ', "-");
+    let slug = format!(
+        "{}-{}",
+        payload.name.to_lowercase().replace(|c: char| !c.is_alphanumeric(), "-"),
+        &Uuid::new_v4().to_string()[..8]
+    );
     let platform = payload.platform.unwrap_or_else(|| "other".to_string());
     let rescan_interval_hrs = payload.rescan_interval_hrs.unwrap_or(24);
 
     if state.has_db() {
-        if let Ok(program) = sqlx::query_as::<_, Program>(
+        match sqlx::query_as::<_, Program>(
             r#"INSERT INTO programs (
                 project_id, name, slug, platform, program_url, notes, rescan_interval_hrs, created_by
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8
-            ) RETURNING *"#,
+            ) ON CONFLICT (project_id, name) DO UPDATE SET updated_at = NOW()
+            RETURNING *"#,
         )
         .bind(project_id)
         .bind(&payload.name)
@@ -94,7 +99,10 @@ pub async fn create_program(
         .fetch_one(state.db())
         .await
         {
-            return Ok(Json(program));
+            Ok(program) => return Ok(Json(program)),
+            Err(e) => {
+                tracing::error!("Failed to create/get program in DB: {e}");
+            }
         }
     }
 

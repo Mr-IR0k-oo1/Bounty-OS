@@ -191,6 +191,10 @@ pub fn create_router(
         .route(
             "/investigations/:id/replan",
             post(crate::handlers::intelligence::replan_investigation),
+        )
+        .route(
+            "/investigations/:id/executions",
+            post(crate::handlers::intelligence::record_execution),
         );
 
     // Protected routes (require valid JWT access token)
@@ -306,7 +310,12 @@ pub fn create_router(
             get(crate::handlers::ports::list_program_ports),
         )
         // URL routes
-        .route("/programs/:id/urls", get(crate::handlers::urls::list_urls))
+        .route(
+            "/programs/:id/urls",
+            get(crate::handlers::urls::list_urls)
+                .post(crate::handlers::urls::create_url)
+                .layer(state_change_limiter.clone()),
+        )
         // Finding routes
         .route("/findings", get(crate::handlers::findings::list_findings))
         .route(

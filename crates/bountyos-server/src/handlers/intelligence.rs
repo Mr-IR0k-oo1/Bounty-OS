@@ -413,7 +413,53 @@ async fn build_state_from_investigation(
 
     let mut state = InvestigationState::new(target, scope, InvestigationProfile::Standard);
 
-    // 3. Load subdomains
+    if let Some(ref purl) = program.program_url {
+        if let Ok(parsed) = reqwest::Url::parse(purl) {
+            let host_str = parsed.host_str().unwrap_or("").to_string();
+            let port_num = parsed.port_or_known_default().unwrap_or(80);
+            if !host_str.is_empty() {
+                state.add_host(&host_str, None);
+                state.add_service(&host_str, port_num, "tcp", Some("http".to_string()), None);
+                state.mark_service_http_probed(&host_str, port_num);
+            }
+        }
+    }
+
+    // 3. Load subdomains (DB + in-memory)
+    if app_state.has_db() {
+        if let Ok(subs) = sqlx::query_as::<_, crate::models::subdomain::Subdomain>(
+            "SELECT * FROM subdomains WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for sub in subs {
+                state.add_subdomain(&sub.subdomain, &sub.source);
+                if let Some(ref ip) = sub.ip_address {
+                    state.mark_subdomain_dns_resolved(&sub.subdomain, vec![ip.clone()], vec![]);
+                }
+                if let Some(ref ws) = sub.web_server {
+                    state.add_technology(DiscoveredTechnology {
+                        name: ws.clone(),
+                        version: None,
+                        cpe: None,
+                        category: Some("Web Server".to_string()),
+                        templates_matched: vec![],
+                    });
+                }
+                for t in &sub.tech {
+                    state.add_technology(DiscoveredTechnology {
+                        name: t.clone(),
+                        version: None,
+                        cpe: None,
+                        category: None,
+                        templates_matched: vec![],
+                    });
+                }
+            }
+        }
+    }
     {
         let lock = app_state.in_memory_subdomains().read().await;
         for sub in lock.iter().filter(|s| s.program_id == investigation_id) {
@@ -442,7 +488,92 @@ async fn build_state_from_investigation(
         }
     }
 
-    // 4. Load findings
+    // 4. Load ports and services
+    if app_state.has_db() {
+        if let Ok(ports) = sqlx::query_as::<_, crate::models::port::Port>(
+            "SELECT * FROM ports WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for port in ports {
+                state.add_host(&port.ip, Some(port.ip.clone()));
+                let is_http = port.port == 80 || port.port == 443 || port.port == 8000 || port.port == 8080 || port.port == 8888 || port.service.as_deref().unwrap_or("").contains("http");
+                state.add_service(&port.ip, port.port as u16, &port.protocol, port.service.clone(), port.banner.clone());
+                if is_http {
+                    state.mark_service_http_probed(&port.ip, port.port as u16);
+                }
+            }
+        }
+    }
+
+    // 5. Load URLs and parameterized endpoints
+    if app_state.has_db() {
+        if let Ok(urls) = sqlx::query_as::<_, crate::models::url::Url>(
+            "SELECT * FROM urls WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for u in urls {
+                if let Ok(parsed) = reqwest::Url::parse(&u.url) {
+                    let host = parsed.host_str().unwrap_or("").to_string();
+                    let port = parsed.port_or_known_default().unwrap_or(80);
+                    let path = parsed.path().to_string();
+                    let mut ep = crate::intelligence::state::DiscoveredEndpoint::new(&u.url, &host, port, &path);
+                    ep.status_code = u.status_code.map(|s| s as u16);
+                    ep.content_type = u.content_type.clone();
+                    ep.crawled = true;
+                    for (k, _v) in parsed.query_pairs() {
+                        ep.params.push(crate::intelligence::state::DiscoveredParam {
+                            name: k.to_string(),
+                            location: crate::intelligence::state::ParamLocation::Query,
+                            reflected: false,
+                            reflection_context: None,
+                            tested_for_xss: false,
+                            tested_for_sqli: false,
+                        });
+                    }
+                    state.add_endpoint(ep);
+                }
+            }
+        }
+    }
+
+    // 6. Load findings (DB + in-memory)
+    if app_state.has_db() {
+        if let Ok(findings) = sqlx::query_as::<_, crate::models::finding::Finding>(
+            "SELECT * FROM findings WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for f in findings {
+                let sev = match f.severity.to_lowercase().as_str() {
+                    "critical" => crate::intelligence::state::FindingSeverity::Critical,
+                    "high" => crate::intelligence::state::FindingSeverity::High,
+                    "medium" => crate::intelligence::state::FindingSeverity::Medium,
+                    "low" => crate::intelligence::state::FindingSeverity::Low,
+                    _ => crate::intelligence::state::FindingSeverity::Info,
+                };
+                let verified = f.status.eq_ignore_ascii_case("verified") || f.status.eq_ignore_ascii_case("confirmed");
+                let conf = if verified {
+                    crate::intelligence::state::FindingConfidence::Confirmed
+                } else {
+                    crate::intelligence::state::FindingConfidence::Firm
+                };
+
+                let endpoint = f.matched_at.clone().unwrap_or_else(|| f.title.clone());
+                let mut sf = StateFinding::new(&f.title, sev, conf, endpoint);
+                sf.id = f.id.to_string();
+                sf.verified = verified;
+                state.add_finding(sf);
+            }
+        }
+    }
     {
         let lock = app_state.in_memory_findings().read().await;
         for f in lock.iter().filter(|f| f.program_id == investigation_id) {
@@ -468,7 +599,46 @@ async fn build_state_from_investigation(
         }
     }
 
-    // 5. Load executed jobs
+    // 7. Load executed actions and jobs (DB + in-memory)
+    if app_state.has_db() {
+        if let Ok(actions) = sqlx::query_as::<_, crate::models::planner_decision::ActionExecution>(
+            "SELECT * FROM action_executions WHERE investigation_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for a in actions {
+                state.record_executed_action(&a.action_type, &a.tool, &a.target, a.execution_duration_ms as u64, a.status == "completed" || a.status == "done", a.error_type);
+            }
+        }
+        if let Ok(jobs) = sqlx::query_as::<_, crate::models::scan_job::ScanJob>(
+            "SELECT * FROM jobs WHERE program_id = $1",
+        )
+        .bind(investigation_id)
+        .fetch_all(app_state.db())
+        .await
+        {
+            for j in jobs {
+                let tool = j
+                    .flags
+                    .as_ref()
+                    .and_then(|fl| fl.get("tool"))
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("unknown");
+                let target_str = j.target.as_deref().unwrap_or("");
+                if j.status == "completed" || j.status == "done" {
+                    state.record_executed_action("scan", tool, target_str, 1000, true, None);
+                }
+            }
+        }
+    }
+    {
+        let lock = app_state.in_memory_action_executions().read().await;
+        for a in lock.iter().filter(|a| a.investigation_id == investigation_id) {
+            state.record_executed_action(&a.action_type, &a.tool, &a.target, a.execution_duration_ms as u64, a.status == "completed" || a.status == "done", a.error_type.clone());
+        }
+    }
     {
         let lock = app_state.in_memory_jobs().read().await;
         for j in lock.iter().filter(|j| j.program_id == investigation_id) {
@@ -780,7 +950,34 @@ pub async fn explain_decision(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let state = build_state_from_investigation(&app_state, id).await?;
     let plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan(id, &state, None);
-    let latest_decision = crate::models::planner_decision::get_latest_planner_decision(&app_state, id).await;
+    let latest_decision = match crate::models::planner_decision::get_latest_planner_decision(&app_state, id).await {
+        Some(d) => Some(d),
+        None => {
+            if let Some(ref action) = plan.selected_action {
+                let decision = crate::models::planner_decision::PlannerDecision {
+                    id: Uuid::new_v4(),
+                    investigation_id: id,
+                    selected_action: action.action_id.clone(),
+                    capability: action.capability.as_str().to_string(),
+                    target: action.target.clone(),
+                    tool: action.tool.clone(),
+                    score: action.score,
+                    score_components: serde_json::to_value(&action.score_components).unwrap_or_default(),
+                    reason: action.reason.clone(),
+                    expected_information_gain: action.expected_information_gain,
+                    estimated_cost: action.estimated_cost.clone(),
+                    alternatives: serde_json::to_value(&plan.alternatives).unwrap_or_default(),
+                    rejected_candidates: serde_json::to_value(&plan.rejected_candidates).unwrap_or_default(),
+                    target_archetype: plan.target_archetype.clone(),
+                    created_at: chrono::Utc::now(),
+                };
+                crate::models::planner_decision::save_planner_decision(&app_state, &decision).await;
+                Some(decision)
+            } else {
+                None
+            }
+        }
+    };
 
     Ok(Json(json!({
         "investigation_id": id,
@@ -804,6 +1001,66 @@ pub async fn replan_investigation(
     Path(id): Path<Uuid>,
 ) -> Result<Json<crate::intelligence::adaptive_planner::AdaptivePlan>, (StatusCode, Json<serde_json::Value>)> {
     get_adaptive_plan(State(app_state), Path(id)).await
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecordExecutionRequest {
+    pub tool: String,
+    pub target: String,
+    #[serde(default)]
+    pub capability: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub error_type: Option<String>,
+    #[serde(default)]
+    pub execution_duration_ms: Option<i64>,
+}
+
+/// Handler for POST /api/investigations/:id/executions
+pub async fn record_execution(
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<RecordExecutionRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let capability = payload.capability.unwrap_or_else(|| payload.tool.clone());
+    let status = payload.status.unwrap_or_else(|| "completed".to_string());
+    let duration = payload.execution_duration_ms.unwrap_or(500);
+
+    let execution_record = crate::models::planner_decision::ActionExecution {
+        id: Uuid::new_v4(),
+        investigation_id: id,
+        decision_id: None,
+        action_type: capability.clone(),
+        capability: capability.clone(),
+        tool: payload.tool.clone(),
+        target: payload.target.clone(),
+        status: status.clone(),
+        assets_before: 0,
+        assets_after: 0,
+        endpoints_before: 0,
+        endpoints_after: 0,
+        parameters_before: 0,
+        parameters_after: 0,
+        findings_before: 0,
+        findings_after: 0,
+        verified_findings_before: 0,
+        verified_findings_after: 0,
+        new_technologies: 0,
+        new_services: 0,
+        execution_duration_ms: duration,
+        exit_status: if status == "failed" { Some(1) } else { Some(0) },
+        error_type: payload.error_type,
+        information_gain: 0.0,
+        created_at: chrono::Utc::now(),
+        completed_at: Some(chrono::Utc::now()),
+    };
+    crate::models::planner_decision::save_action_execution(&app_state, &execution_record).await;
+
+    Ok(Json(json!({
+        "status": "recorded",
+        "execution_id": execution_record.id,
+    })))
 }
 
 

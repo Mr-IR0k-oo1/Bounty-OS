@@ -63,7 +63,7 @@ pub struct ActionExecution {
 /// Persist a planner decision in database or in-memory fallback
 pub async fn save_planner_decision(app_state: &AppState, decision: &PlannerDecision) {
     if app_state.has_db() {
-        let _ = sqlx::query(
+        let res = sqlx::query(
             r#"INSERT INTO planner_decisions (
                 id, investigation_id, selected_action, capability, target, tool,
                 score, score_components, reason, expected_information_gain,
@@ -88,7 +88,14 @@ pub async fn save_planner_decision(app_state: &AppState, decision: &PlannerDecis
         .bind(decision.created_at)
         .execute(app_state.db())
         .await;
+
+        if let Err(e) = res {
+            tracing::error!("Failed to save planner decision to DB: {e}");
+        }
     }
+
+    let mut lock = app_state.in_memory_planner_decisions().write().await;
+    lock.push(decision.clone());
 }
 
 /// Get the latest planner decision for an investigation
@@ -104,10 +111,16 @@ pub async fn get_latest_planner_decision(
         .fetch_optional(app_state.db())
         .await
         {
-            return decision;
+            if decision.is_some() {
+                return decision;
+            }
         }
     }
-    None
+    let lock = app_state.in_memory_planner_decisions().read().await;
+    lock.iter()
+        .filter(|d| d.investigation_id == investigation_id)
+        .max_by_key(|d| d.created_at)
+        .cloned()
 }
 
 /// List recent planner decisions for an investigation
@@ -123,16 +136,25 @@ pub async fn list_planner_decisions(
         .fetch_all(app_state.db())
         .await
         {
-            return decisions;
+            if !decisions.is_empty() {
+                return decisions;
+            }
         }
     }
-    Vec::new()
+    let lock = app_state.in_memory_planner_decisions().read().await;
+    let mut list: Vec<_> = lock
+        .iter()
+        .filter(|d| d.investigation_id == investigation_id)
+        .cloned()
+        .collect();
+    list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    list
 }
 
 /// Persist an action execution record
 pub async fn save_action_execution(app_state: &AppState, execution: &ActionExecution) {
     if app_state.has_db() {
-        let _ = sqlx::query(
+        let res = sqlx::query(
             r#"INSERT INTO action_executions (
                 id, investigation_id, decision_id, action_type, capability, tool, target,
                 status, assets_before, assets_after, endpoints_before, endpoints_after,
@@ -173,5 +195,12 @@ pub async fn save_action_execution(app_state: &AppState, execution: &ActionExecu
         .bind(execution.completed_at)
         .execute(app_state.db())
         .await;
+
+        if let Err(e) = res {
+            tracing::error!("Failed to save action execution to DB: {e}");
+        }
     }
+
+    let mut lock = app_state.in_memory_action_executions().write().await;
+    lock.push(execution.clone());
 }

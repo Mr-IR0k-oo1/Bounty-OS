@@ -45,9 +45,10 @@ pub async fn create_project(
     let created_by = user_id_ext.map(|axum::extract::Extension(id)| id);
 
     if state.has_db() {
-        if let Ok(project) = sqlx::query_as::<_, Project>(
+        match sqlx::query_as::<_, Project>(
             r#"INSERT INTO projects (name, description, start_date, end_date, created_by)
              VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
              RETURNING *"#,
         )
         .bind(&payload.name)
@@ -58,7 +59,10 @@ pub async fn create_project(
         .fetch_one(state.db())
         .await
         {
-            return Ok(Json(project));
+            Ok(project) => return Ok(Json(project)),
+            Err(e) => {
+                tracing::error!("Failed to create/get project in DB: {e}");
+            }
         }
     }
 

@@ -32,6 +32,8 @@ pub struct AppState {
     in_memory_experience: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceAction>>>,
     in_memory_provenance: Arc<tokio::sync::RwLock<Vec<crate::models::experience::ExperienceProvenance>>>,
     in_memory_target_profiles: Arc<tokio::sync::RwLock<Vec<crate::models::target_profile::TargetProfile>>>,
+    in_memory_planner_decisions: Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::PlannerDecision>>>,
+    in_memory_action_executions: Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::ActionExecution>>>,
 }
 
 impl AppState {
@@ -57,6 +59,8 @@ impl AppState {
         let in_memory_experience = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_provenance = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let in_memory_target_profiles = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_planner_decisions = Arc::new(tokio::sync::RwLock::new(Vec::new()));
+        let in_memory_action_executions = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         Self {
             db_pool,
             redis_pool,
@@ -78,6 +82,8 @@ impl AppState {
             in_memory_experience,
             in_memory_provenance,
             in_memory_target_profiles,
+            in_memory_planner_decisions,
+            in_memory_action_executions,
         }
     }
 
@@ -641,6 +647,18 @@ impl AppState {
         &self,
     ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::target_profile::TargetProfile>>> {
         &self.in_memory_target_profiles
+    }
+
+    pub fn in_memory_planner_decisions(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::PlannerDecision>>> {
+        &self.in_memory_planner_decisions
+    }
+
+    pub fn in_memory_action_executions(
+        &self,
+    ) -> &Arc<tokio::sync::RwLock<Vec<crate::models::planner_decision::ActionExecution>>> {
+        &self.in_memory_action_executions
     }
 
     pub fn db(&self) -> &PgPool {
