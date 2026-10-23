@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-23T12:08:36.402Z",
+  "timestamp": "2026-10-23T12:39:07.832Z",
   "results": {
     "total": 13,
     "passed": 13,
@@ -10,79 +10,79 @@
       "title": "Admin authentication & operator token active",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T12:08:36.302Z"
+      "timestamp": "2026-10-23T12:39:07.715Z"
     },
     {
       "title": "Investigation initialized with dual-boundary scope",
       "pass": true,
-      "detail": "ID: 1d6f376f-2df4-4cd2-97e8-1f91682288da",
-      "timestamp": "2026-10-23T12:08:36.325Z"
+      "detail": "ID: 49e11e1c-6b14-4431-bab5-49883ab260fe",
+      "timestamp": "2026-10-23T12:39:07.734Z"
     },
     {
       "title": "Direct API execution on explicit OOS target strictly rejected",
       "pass": true,
       "detail": "HTTP status: 422",
-      "timestamp": "2026-10-23T12:08:36.330Z"
+      "timestamp": "2026-10-23T12:39:07.738Z"
     },
     {
       "title": "Direct API execution on unlisted external target strictly rejected",
       "pass": true,
       "detail": "HTTP status: 422",
-      "timestamp": "2026-10-23T12:08:36.332Z"
+      "timestamp": "2026-10-23T12:39:07.741Z"
     },
     {
       "title": "Planner candidate space strictly constrained to authorized scope",
       "pass": true,
       "detail": "Selected: \"http://target.local:8888\" (0 forbidden targets in 5 alternatives)",
-      "timestamp": "2026-10-23T12:08:36.337Z"
+      "timestamp": "2026-10-23T12:39:07.745Z"
     },
     {
       "title": "Execution of dangerous/unwhitelisted tool rejected",
       "pass": true,
       "detail": "HTTP status: 400",
-      "timestamp": "2026-10-23T12:08:36.340Z"
+      "timestamp": "2026-10-23T12:39:07.747Z"
     },
     {
       "title": "Planner actions strictly emit typed domain adapters (no shell injection)",
       "pass": true,
       "detail": "Verified 6 planned candidate tools against adapter registry",
-      "timestamp": "2026-10-23T12:08:36.345Z"
+      "timestamp": "2026-10-23T12:39:07.753Z"
     },
     {
       "title": "PreconditionEngine rejects vulnerability analysis without parameter evidence",
       "pass": true,
       "detail": "Rejected XSS: \"No endpoints with input parameters found for XSS analysis\" | SQLi: \"No parameterized endpoints found for SQL injection testing\"",
-      "timestamp": "2026-10-23T12:08:36.349Z"
+      "timestamp": "2026-10-23T12:39:07.758Z"
     },
     {
       "title": "Deterministic verification requires verifiable target existence",
       "pass": true,
       "detail": "Status: 200",
-      "timestamp": "2026-10-23T12:08:36.366Z"
+      "timestamp": "2026-10-23T12:39:07.797Z"
     },
     {
       "title": "Initial candidate action selected",
       "pass": true,
       "detail": "crawl_application on http://target.local:8888",
-      "timestamp": "2026-10-23T12:08:36.371Z"
+      "timestamp": "2026-10-23T12:39:07.802Z"
     },
     {
       "title": "RedundancyEngine suppresses immediate repeat of executed action",
       "pass": true,
       "detail": "Previous: crawl_application -> Next: generate_threat_model",
-      "timestamp": "2026-10-23T12:08:36.378Z"
+      "timestamp": "2026-10-23T12:39:07.810Z"
     },
     {
       "title": "Dead asset with repeated failures is penalized and deprioritized",
       "pass": true,
       "detail": "Selected target prioritized live asset: \"http://target.local:8888\" (dead target \"http://dead-host.target.local:8888/unreachable\" deprioritized)",
-      "timestamp": "2026-10-23T12:08:36.392Z"
+      "timestamp": "2026-10-23T12:39:07.822Z"
     },
     {
       "title": "High-value unexplored API parameter immediately prioritized by planner",
       "pass": true,
       "detail": "Selected: investigate_authorization (authz_engine) targeting http://target.local:8888/api/v1/users?search=admin [Score: 92]",
-      "timestamp": "2026-10-23T12:08:36.402Z"
+      "timestamp": "2026-10-23T12:39:07.832Z"
     }
   ]
 }

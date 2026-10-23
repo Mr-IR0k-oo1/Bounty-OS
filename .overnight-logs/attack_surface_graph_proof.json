@@ -1,6 +1,6 @@
 {
   "test_suite": "Bounty OS Attack Surface Graph v0.2",
-  "timestamp": "2026-10-23T12:01:25.106Z",
+  "timestamp": "2026-10-23T12:38:55.891Z",
   "passed": 13,
   "failed": 0,
   "tests": [
@@ -8,79 +8,79 @@
       "title": "Backend server connectivity",
       "pass": true,
       "detail": "HTTP 200",
-      "timestamp": "2026-10-23T12:01:25.116Z"
+      "timestamp": "2026-10-23T12:38:55.905Z"
     },
     {
       "title": "Admin authentication",
       "pass": true,
       "detail": "Bearer token acquired",
-      "timestamp": "2026-10-23T12:01:25.145Z"
+      "timestamp": "2026-10-23T12:38:56.044Z"
     },
     {
       "title": "Target investigation resolution",
       "pass": true,
-      "detail": "ID: 28c3d1a3-fc17-4bd5-98f5-45a5e3e89142",
-      "timestamp": "2026-10-23T12:01:25.158Z"
+      "detail": "ID: c7b6ed0f-2eb0-44c6-96d2-3f0d970aacf2",
+      "timestamp": "2026-10-23T12:38:56.073Z"
     },
     {
       "title": "Graph relationship ingestion with provenance",
       "pass": true,
       "detail": "source: katana, relationship: hosts_endpoint",
-      "timestamp": "2026-10-23T12:01:25.162Z"
+      "timestamp": "2026-10-23T12:38:56.078Z"
     },
     {
       "title": "Query graph provenance relationships",
       "pass": true,
       "detail": "Retrieved 1 relationship edges with provenance",
-      "timestamp": "2026-10-23T12:01:25.166Z"
+      "timestamp": "2026-10-23T12:38:56.084Z"
     },
     {
       "title": "Attack surface summary metrics",
       "pass": true,
       "detail": "Targets: 1, Assets: 1, Endpoints: 0, Unexplored: 1",
-      "timestamp": "2026-10-23T12:01:25.179Z"
+      "timestamp": "2026-10-23T12:38:56.105Z"
     },
     {
       "title": "Graph-backed attack surface model projection",
       "pass": true,
       "detail": "Projected 2 nodes and 2 edges",
-      "timestamp": "2026-10-23T12:01:25.190Z"
+      "timestamp": "2026-10-23T12:38:56.116Z"
     },
     {
       "title": "Identify unexplored attack surface opportunities",
       "pass": true,
       "detail": "Found 1 unexplored nodes (top priority: dns_resolution on target.local)",
-      "timestamp": "2026-10-23T12:01:25.195Z"
+      "timestamp": "2026-10-23T12:38:56.121Z"
     },
     {
       "title": "Adaptive planner action selection driven by unexplored surface",
       "pass": true,
       "detail": "Selected: crawl_application (katana) targeting http://target.local:8888 [Score: 87.0]",
-      "timestamp": "2026-10-23T12:01:25.200Z"
+      "timestamp": "2026-10-23T12:38:56.129Z"
     },
     {
       "title": "Execute tool action and record empirical delta",
       "pass": true,
-      "detail": "Execution ID: be323e98-456e-4f59-88fb-fefcdecf3f31",
-      "timestamp": "2026-10-23T12:01:25.203Z"
+      "detail": "Execution ID: c9f5e056-9479-44a1-835e-cac531b9b01f",
+      "timestamp": "2026-10-23T12:38:56.134Z"
     },
     {
       "title": "Graph state update with newly discovered evidence",
       "pass": true,
       "detail": "Finding registered on attack surface",
-      "timestamp": "2026-10-23T12:01:25.207Z"
+      "timestamp": "2026-10-23T12:38:56.140Z"
     },
     {
       "title": "Attack surface graph evolves with confirmed findings",
       "pass": true,
       "detail": "Graph updated to 3 nodes (Finding node attached)",
-      "timestamp": "2026-10-23T12:01:25.212Z"
+      "timestamp": "2026-10-23T12:38:56.157Z"
     },
     {
       "title": "Closed-loop decision adaptation: Planner prioritizes alternative unexplored surface",
       "pass": true,
       "detail": "Previous: crawl_application:katana:http://target.local:8888 on http://target.local:8888 -> Next: verify_finding:deterministic_verifier:http://target.local:8888 on http://target.local:8888",
-      "timestamp": "2026-10-23T12:01:25.215Z"
+      "timestamp": "2026-10-23T12:38:56.168Z"
     }
   ]
 }

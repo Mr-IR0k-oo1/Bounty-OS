@@ -181,5 +181,48 @@ export const api = {
   getNextAction: (programId: string) => request<any>(`/investigations/${programId}/next-action`),
   explainDecision: (programId: string) => request<any>(`/investigations/${programId}/explain-decision`),
   replanInvestigation: (programId: string) => request<any>(`/investigations/${programId}/replan`, { method: 'POST' }),
+  recordExecution: (programId: string, data: { tool: string; target: string; capability?: string; status?: string; error_type?: string; execution_duration_ms?: number }) =>
+    request<any>(`/investigations/${programId}/executions`, { method: 'POST', body: JSON.stringify(data) }),
+  listDecisions: (programId: string) => request<any[]>(`/investigations/${programId}/decisions`),
+  
+  // Attack Surface Graph v0.2
+  getAttackSurfaceGraph: (programId: string) => request<any>(`/investigations/${programId}/graph`),
+  getAttackSurfaceSummary: (programId: string) => request<any>(`/investigations/${programId}/graph/summary`),
+  getAttackSurfaceUnexplored: (programId: string) => request<any[]>(`/investigations/${programId}/graph/unexplored`),
+  listAttackSurfaceRelationships: (programId: string) => request<any[]>(`/investigations/${programId}/graph/relationships`),
+  recordAttackSurfaceRelationship: (programId: string, data: any) =>
+    request<{ status: string; id: string }>(`/investigations/${programId}/graph/relationships`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Target Intelligence, Archetypes & Experience
+  getInvestigationArchetype: (programId: string) => request<any>(`/investigations/${programId}/archetype`),
+  getInvestigationProfile: (programId: string) => request<any>(`/investigations/${programId}/profile`),
+  getInvestigationPolicy: (programId: string) => request<any>(`/investigations/${programId}/policy`),
+  getExperienceActions: () => request<any[]>('/experience/actions'),
+  getExperienceProvenance: () => request<any[]>('/experience/provenance'),
+
+  // Interactive Tools & Target Policies (Ars0n Phase 8–13)
+  getEducation: (programId: string) => request<any>(`/investigations/${programId}/education`),
+  getThreats: (programId: string) => request<any[]>(`/investigations/${programId}/threats`),
+  getPrioritization: (programId: string) => request<any>(`/investigations/${programId}/prioritization`),
+  analyzeBehavior: (programId: string, target_url: string, probe_count?: number) =>
+    request<any>(`/investigations/${programId}/behavior`, {
+      method: 'POST',
+      body: JSON.stringify({ target_url, probe_count: probe_count || 5 }),
+    }),
+  replayFlow: (programId: string, flow: any, dry_run?: boolean) =>
+    request<any>(`/investigations/${programId}/flows/replay`, {
+      method: 'POST',
+      body: JSON.stringify({ flow, dry_run: !!dry_run }),
+    }),
+  testAuthz: (programId: string, endpoint: string, user_tokens: any[], method?: string) =>
+    request<any>(`/investigations/${programId}/authz/test`, {
+      method: 'POST',
+      body: JSON.stringify({ endpoint, user_tokens, method: method || 'GET' }),
+    }),
+  getSystemHealth: () => request<any>('/system/health'),
 }
+
 

@@ -36,6 +36,11 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
   const [replayLoading, setReplayLoading] = useState(false)
   const [replayResult, setReplayResult] = useState<any>(null)
 
+  // BOLA IDOR tester state
+  const [authzEndpoint, setAuthzEndpoint] = useState("")
+  const [authzLoading, setAuthzLoading] = useState(false)
+  const [authzResult, setAuthzResult] = useState<any>(null)
+
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -52,6 +57,7 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
       if (profRes && !probeUrl) {
         setProbeUrl(`http://${programName}`)
         setFlowTarget(`http://${programName}/api`)
+        setAuthzEndpoint(`http://${programName}/api/v1/resources/{id}`)
       }
     } catch (e) {
       console.error("Failed to load intelligence state", e)
@@ -111,6 +117,34 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
       console.error(e)
     } finally {
       setReplayLoading(false)
+    }
+  }
+
+  const handleTestAuthz = async () => {
+    if (!authzEndpoint) return
+    setAuthzLoading(true)
+    try {
+      const res = await fetch(`/api/investigations/${programId}/authz/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint_template: authzEndpoint,
+          resource_id_a: "res_primary",
+          identity_b: {
+            user_id: "user_attacker",
+            token: "attacker_token",
+            role: "unprivileged_user",
+          },
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAuthzResult(data)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAuthzLoading(false)
     }
   }
 
@@ -387,6 +421,43 @@ export function IntelligenceLearningTab({ programId, programName }: Intelligence
                   {replayResult.response_body_snippet}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* BOLA / IDOR Authorization Matrix Tester */}
+        <div className="card p-5 space-y-4 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-text-primary flex items-center gap-2">
+              <Lock className="w-4 h-4 text-rose-400" />
+              Multi-Role BOLA / IDOR Authorization Matrix Tester
+            </h4>
+            <span className="text-[10px] text-text-muted font-mono">Ars0n Phase 8 Deterministic Engine</span>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={authzEndpoint}
+              onChange={(e) => setAuthzEndpoint(e.target.value)}
+              placeholder="http://target/api/v1/resources/{id}"
+              className="text-xs font-mono"
+            />
+            <Button size="sm" onClick={handleTestAuthz} disabled={authzLoading} className="gap-2 shrink-0 text-xs bg-rose-600 hover:bg-rose-500 text-white">
+              {authzLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+              Test BOLA
+            </Button>
+          </div>
+
+          {authzResult && (
+            <div className="bg-background/80 p-3 rounded-lg border border-border/70 text-xs font-mono space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted">Observation:</span>
+                <span className={authzResult.violation ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                  {authzResult.violation ? "BOLA VIOLATION DETECTED" : "Access Denied (403/401 Enforced)"}
+                </span>
+              </div>
+              <pre className="text-[11px] text-text-secondary overflow-x-auto max-h-32">
+                {JSON.stringify(authzResult, null, 2)}
+              </pre>
             </div>
           )}
         </div>

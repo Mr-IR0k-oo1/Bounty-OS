@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   FolderKanban, Target, Bug, Users, Clock,
   Activity, Play, ArrowUpRight, ArrowDownRight, ChevronRight, RadioTower,
-  RefreshCw, CheckCircle2, AlertCircle
+  RefreshCw, CheckCircle2, AlertCircle, Network, Cpu
 } from "lucide-react"
 import {
   Area, AreaChart, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, CartesianGrid
@@ -268,6 +268,37 @@ export default function DashboardPage() {
           >
             <Play className="w-3.5 h-3.5" /> Quick Scan
           </button>
+        </div>
+      </div>
+
+      {/* Autonomous Intelligence & Attack Surface Overview Strip */}
+      <div className="card p-4 bg-gradient-to-r from-indigo-950/40 via-bg-elevated to-indigo-950/20 border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 shadow-lg shadow-indigo-950/50">
+            <Network className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-text-primary">Autonomous Attack Surface & Intelligence Engine</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                v0.7 Active
+              </span>
+            </div>
+            <p className="text-xs text-text-muted mt-0.5">
+              Graph v0.2 normalized hierarchy, empirical action priors V(a), and adaptive planning online.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/intelligence"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-md shadow-indigo-950"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            Launch Intelligence Console
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
 

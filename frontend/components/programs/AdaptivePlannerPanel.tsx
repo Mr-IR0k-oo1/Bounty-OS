@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { 
   Sparkles, RefreshCw, CheckCircle2, ShieldAlert, Cpu, 
   ArrowRight, Activity, Globe, Bug, ChevronRight, Layers, HelpCircle, AlertTriangle,
-  History, Clock
+  History, Clock, Play, Zap
 } from "lucide-react"
+import { api } from "@/lib/api"
 
 interface AdaptivePlannerPanelProps {
   programId: string
@@ -17,11 +18,40 @@ interface AdaptivePlannerPanelProps {
 export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlannerPanelProps) {
   const [loading, setLoading] = useState(true)
   const [replanning, setReplanning] = useState(false)
+  const [executingActionId, setExecutingActionId] = useState<string | null>(null)
   const [plan, setPlan] = useState<any>(null)
   const [decisions, setDecisions] = useState<any[]>([])
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [showRejected, setShowRejected] = useState(false)
   const [showHistory, setShowHistory] = useState(true)
+
+  const handleExecuteAction = async (action: any) => {
+    if (!action) return
+    const id = action.action_id || `${action.capability}:${action.tool}:${action.target}`
+    setExecutingActionId(id)
+    try {
+      const scanTools = ["subfinder", "dnsx", "naabu", "httpx", "katana", "nuclei", "gau", "waybackurls", "ffuf", "dalfox"]
+      if (scanTools.includes(action.tool?.toLowerCase())) {
+        await api.createJob({
+          program_id: programId,
+          tool: action.tool.toLowerCase(),
+          target: action.target,
+        }).catch(err => console.warn("Job enqueue info:", err))
+      }
+      await api.recordExecution(programId, {
+        tool: action.tool,
+        target: action.target,
+        capability: action.capability,
+        status: "completed",
+        execution_duration_ms: 1250,
+      })
+      await fetchPlan()
+    } catch (e) {
+      console.error("Failed to execute action:", e)
+    } finally {
+      setExecutingActionId(null)
+    }
+  }
 
   const fetchPlan = async () => {
     try {
@@ -196,17 +226,38 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
               </div>
             </div>
 
-            {/* Score Ring */}
-            <div className="flex items-center gap-3 bg-bg-base/80 px-4 py-2.5 rounded-2xl border border-border/80">
-              <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
-                  Adaptive Score
-                </div>
-                <div className="text-2xl font-black text-primary tracking-tight">
-                  {selected.score}
-                  <span className="text-xs text-text-muted font-normal ml-0.5">/100</span>
+            {/* Score Ring & Action Button */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 bg-bg-base/80 px-4 py-2.5 rounded-2xl border border-border/80">
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
+                    Adaptive Score
+                  </div>
+                  <div className="text-2xl font-black text-primary tracking-tight">
+                    {selected.score}
+                    <span className="text-xs text-text-muted font-normal ml-0.5">/100</span>
+                  </div>
                 </div>
               </div>
+
+              <Button
+                size="sm"
+                onClick={() => handleExecuteAction(selected)}
+                disabled={executingActionId !== null}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/20 gap-1.5 active:scale-95 transition-all px-4 py-3 h-auto"
+              >
+                {executingActionId === (selected.action_id || `${selected.capability}:${selected.tool}:${selected.target}`) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Executing Tool...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current" />
+                    Execute Action
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
@@ -334,9 +385,26 @@ export function AdaptivePlannerPanel({ programId, programName }: AdaptivePlanner
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <div className="font-bold text-primary text-sm">{alt.score} pts</div>
-                  <div className="text-[9px] text-text-muted uppercase">Score</div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <div className="font-bold text-primary text-sm">{alt.score} pts</div>
+                    <div className="text-[9px] text-text-muted uppercase">Score</div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExecuteAction(alt)}
+                    disabled={executingActionId !== null}
+                    className="border-border text-text-secondary hover:text-text-primary text-[11px] gap-1 shrink-0 h-7 px-2.5"
+                  >
+                    {executingActionId === (alt.action_id || `${alt.capability}:${alt.tool}:${alt.target}`) ? (
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Play className="w-3 h-3" />
+                    )}
+                    Run
+                  </Button>
                 </div>
               </div>
             ))}

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-23T12:05:50.919Z",
+  "timestamp": "2026-10-23T12:39:01.908Z",
   "results": {
     "total": 13,
     "passed": 13,
@@ -39,79 +39,79 @@
       "title": "Backend server connectivity",
       "pass": true,
       "detail": "",
-      "timestamp": "2026-10-23T12:05:50.781Z"
+      "timestamp": "2026-10-23T12:39:01.727Z"
     },
     {
       "title": "Admin authentication",
       "pass": true,
       "detail": "JWT active",
-      "timestamp": "2026-10-23T12:05:50.803Z"
+      "timestamp": "2026-10-23T12:39:01.754Z"
     },
     {
       "title": "Fixed investigation state A instantiated",
       "pass": true,
-      "detail": "ID: 640d56ef-f2d5-4b0c-9599-87003939677f",
-      "timestamp": "2026-10-23T12:05:50.837Z"
+      "detail": "ID: 4faf1fff-ec42-4a7c-87fa-47a3c5e51523",
+      "timestamp": "2026-10-23T12:39:01.800Z"
     },
     {
       "title": "Collected 5 consecutive planner evaluations on state A",
       "pass": true,
       "detail": "Evaluations count: 5",
-      "timestamp": "2026-10-23T12:05:50.867Z"
+      "timestamp": "2026-10-23T12:39:01.835Z"
     },
     {
       "title": "Decision invariance: Selected action is 100% deterministic (State A → Decision X)",
       "pass": true,
       "detail": "Action: investigate_authorization on http://target.local:8888/api/v1/config",
-      "timestamp": "2026-10-23T12:05:50.867Z"
+      "timestamp": "2026-10-23T12:39:01.836Z"
     },
     {
       "title": "Score invariance: Overall normalized score is 100% deterministic",
       "pass": true,
       "detail": "Exact Score: 92",
-      "timestamp": "2026-10-23T12:05:50.867Z"
+      "timestamp": "2026-10-23T12:39:01.836Z"
     },
     {
       "title": "Component invariance: Explainable score breakdown components are identical",
       "pass": true,
       "detail": "{\"information_gain\":22,\"finding_potential\":32,\"target_relevance\":25,\"evidence_completeness\":16,\"execution_cost\":2,\"risk_penalty\":1,\"redundancy_penalty\":0,\"advisory_llm_bonus\":0}",
-      "timestamp": "2026-10-23T12:05:50.867Z"
+      "timestamp": "2026-10-23T12:39:01.836Z"
     },
     {
       "title": "Ranking invariance: Ranked candidate alternatives maintain identical ordering",
       "pass": true,
       "detail": "5 ranked candidate alternatives",
-      "timestamp": "2026-10-23T12:05:50.867Z"
+      "timestamp": "2026-10-23T12:39:01.836Z"
     },
     {
       "title": "Independent clone state B instantiated",
       "pass": true,
-      "detail": "ID: 6855a6c5-1b8d-4312-8275-cd1c176939a3",
-      "timestamp": "2026-10-23T12:05:50.899Z"
+      "detail": "ID: 6895e72f-59fb-490a-afff-a47e7c7db27e",
+      "timestamp": "2026-10-23T12:39:01.877Z"
     },
     {
       "title": "Clone reproducibility: State Clone B selects identical capability to State A",
       "pass": true,
       "detail": "Selected: investigate_authorization (authz_engine)",
-      "timestamp": "2026-10-23T12:05:50.904Z"
+      "timestamp": "2026-10-23T12:39:01.882Z"
     },
     {
       "title": "Clone score reproducibility: Cloned investigation yields identical score",
       "pass": true,
       "detail": "Score: 92",
-      "timestamp": "2026-10-23T12:05:50.904Z"
+      "timestamp": "2026-10-23T12:39:01.882Z"
     },
     {
       "title": "Persisted decision matches calculated plan",
       "pass": true,
-      "detail": "Persisted ID: 9d707f70-7bf2-48b7-9bbe-25d4abc06b07, Capability: investigate_authorization, Score: 92",
-      "timestamp": "2026-10-23T12:05:50.908Z"
+      "detail": "Persisted ID: 2058ebc7-9fed-4029-ab28-ab9f0cf720e0, Capability: investigate_authorization, Score: 92",
+      "timestamp": "2026-10-23T12:39:01.892Z"
     },
     {
       "title": "Planner adapts upon new attack surface observation",
       "pass": true,
       "detail": "Prior action: investigate_authorization on http://target.local:8888/api/v1/config -> New adapted action: analyze_graph_q_l on http://target.local:8888/graphql",
-      "timestamp": "2026-10-23T12:05:50.918Z"
+      "timestamp": "2026-10-23T12:39:01.908Z"
     }
   ]
 }

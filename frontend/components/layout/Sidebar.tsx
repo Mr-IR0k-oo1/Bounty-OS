@@ -4,7 +4,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, FolderKanban, Target, Bug, Images,
-  Activity, Radio, Settings, Users, Shield, ChevronRight, PanelLeftClose, PanelLeft, X
+  Activity, Radio, Settings, Users, Shield, ChevronRight, PanelLeftClose, PanelLeft, X,
+  Cpu
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -13,6 +14,7 @@ const navGroups = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/projects", label: "Projects", icon: FolderKanban },
     { href: "/programs", label: "Programs", icon: Target },
+    { href: "/intelligence", label: "Intelligence", icon: Cpu },
     { href: "/findings", label: "Findings", icon: Bug },
     { href: "/gallery", label: "Gallery", icon: Images },
   ]},
