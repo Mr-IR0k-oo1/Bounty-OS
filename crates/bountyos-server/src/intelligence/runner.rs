@@ -9,6 +9,7 @@ use axum::Json;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -182,6 +183,27 @@ pub async fn list_investigation_actions(
         .collect()
 }
 
+/// Emit a structured planner lifecycle event over the WebSocket broadcast channel.
+///
+/// Events use a stable JSON envelope `{ "event": "planner.*", "investigation_id", ... }`
+/// so the frontend and MCP clients can render the live decision stream. Event kinds:
+/// `planner.decision`, `planner.action_started`, `planner.action_completed`,
+/// `planner.action_rejected`, `planner.investigation_stopped`.
+pub fn emit_planner_event(
+    app_state: &AppState,
+    event: &str,
+    investigation_id: Uuid,
+    mut payload: serde_json::Map<String, serde_json::Value>,
+) {
+    payload.insert("event".to_string(), json!(event));
+    payload.insert("investigation_id".to_string(), json!(investigation_id));
+    payload.insert("ts".to_string(), json!(Utc::now().to_rfc3339()));
+    let envelope = serde_json::Value::Object(payload);
+    let _ = app_state
+        .ws_tx()
+        .send(serde_json::to_string(&envelope).unwrap_or_default());
+}
+
 pub struct AutonomousInvestigationRunner;
 
 impl AutonomousInvestigationRunner {
@@ -236,7 +258,10 @@ impl AutonomousInvestigationRunner {
             let target_profile = crate::intelligence::profiler::TargetProfiler::profile(investigation_id, &state);
             let _ = crate::models::target_profile::save_target_profile(app_state, &target_profile).await;
 
-            let plan = IntelligencePlanner::plan_with_policy(
+            // a.1 Build ADVISORY boosts (bounded 0..10 per tool) from empirical history and the
+            // strategic VulnLLM prioritization. These are advisory signals only: the deterministic
+            // Adaptive Planner decides whether, and what, to execute (requirement 13).
+            let advisory_boosts = Self::build_advisory_boosts(
                 &state,
                 Some(&historical_stats),
                 prioritization.as_ref(),
@@ -244,13 +269,120 @@ impl AutonomousInvestigationRunner {
                 Some(&archetype_classification),
                 Some(&target_profile),
             );
-            let action = match plan.recommended_action {
-                Some(a) => a,
-                None => {
-                    stop_reason = Some("Planner returned no actionable candidates".to_string());
+
+            // a.2 ADAPTIVE PLANNER is the decision engine. It evaluates the observed attack
+            // surface, enforces preconditions / redundancy / scope, scores explainably, and
+            // selects the highest-value executable action (10 integrated tools + verifier).
+            let adaptive_plan = crate::intelligence::adaptive_planner::AdaptivePlanner::plan_executable(
+                investigation_id,
+                &state,
+                Some(&advisory_boosts),
+            );
+
+            // a.3 Persist the planner decision (every decision is persisted; requirement 4)
+            let decision_id = Uuid::new_v4();
+            let decision_tool = adaptive_plan
+                .selected_action
+                .as_ref()
+                .map(|a| a.tool.clone())
+                .unwrap_or_else(|| "none".to_string());
+            let decision = crate::models::planner_decision::PlannerDecision {
+                id: decision_id,
+                investigation_id,
+                selected_action: adaptive_plan
+                    .selected_action
+                    .as_ref()
+                    .map(|a| a.capability.as_str().to_string())
+                    .unwrap_or_else(|| "stop".to_string()),
+                capability: adaptive_plan
+                    .selected_action
+                    .as_ref()
+                    .map(|a| a.capability.as_str().to_string())
+                    .unwrap_or_else(|| "stop".to_string()),
+                target: adaptive_plan
+                    .selected_action
+                    .as_ref()
+                    .map(|a| a.target.clone())
+                    .unwrap_or_else(|| state.target.clone()),
+                tool: decision_tool.clone(),
+                score: adaptive_plan.score,
+                score_components: serde_json::to_value(&adaptive_plan.score_components)
+                    .unwrap_or(serde_json::Value::Null),
+                reason: adaptive_plan.reason.clone(),
+                expected_information_gain: adaptive_plan
+                    .selected_action
+                    .as_ref()
+                    .map(|a| a.expected_information_gain)
+                    .unwrap_or(0.0),
+                estimated_cost: adaptive_plan
+                    .selected_action
+                    .as_ref()
+                    .map(|a| a.estimated_cost.clone())
+                    .unwrap_or_else(|| "none".to_string()),
+                alternatives: serde_json::to_value(&adaptive_plan.alternatives)
+                    .unwrap_or(serde_json::Value::Null),
+                rejected_candidates: serde_json::to_value(&adaptive_plan.rejected_candidates)
+                    .unwrap_or(serde_json::Value::Null),
+                target_archetype: adaptive_plan.target_archetype.clone(),
+                created_at: Utc::now(),
+            };
+            crate::models::planner_decision::save_planner_decision(app_state, &decision).await;
+
+            // a.4 Emit the decision event + any rejected-candidate events for live auditability
+            {
+                let mut p = serde_json::Map::new();
+                p.insert("cycle".to_string(), json!(cycle));
+                p.insert("decision_id".to_string(), json!(decision_id));
+                p.insert("capability".to_string(), json!(decision.capability));
+                p.insert("tool".to_string(), json!(decision.tool));
+                p.insert("target".to_string(), json!(decision.target));
+                p.insert("score".to_string(), json!(decision.score));
+                p.insert("reason".to_string(), json!(decision.reason));
+                p.insert("archetype".to_string(), json!(decision.target_archetype));
+                p.insert("is_stop".to_string(), json!(adaptive_plan.is_stop));
+                emit_planner_event(app_state, "planner.decision", investigation_id, p);
+            }
+            for rc in &adaptive_plan.rejected_candidates {
+                let mut p = serde_json::Map::new();
+                p.insert("cycle".to_string(), json!(cycle));
+                p.insert("capability".to_string(), json!(rc.capability.as_str()));
+                p.insert("target".to_string(), json!(rc.target));
+                p.insert("reason".to_string(), json!(rc.reason));
+                p.insert("missing_prerequisite".to_string(), json!(rc.missing_prerequisite));
+                emit_planner_event(app_state, "planner.action_rejected", investigation_id, p);
+            }
+
+            // a.5 Stop deterministically when the planner has no justified action (requirement 14)
+            let selected = match adaptive_plan.selected_action {
+                Some(a) if !adaptive_plan.is_stop => a,
+                _ => {
+                    let reason = adaptive_plan
+                        .stop_reason
+                        .unwrap_or_else(|| "No justified remaining actions".to_string());
+                    let mut p = serde_json::Map::new();
+                    p.insert("cycle".to_string(), json!(cycle));
+                    p.insert("stop_reason".to_string(), json!(reason));
+                    emit_planner_event(app_state, "planner.investigation_stopped", investigation_id, p);
+                    stop_reason = Some(reason);
                     break;
                 }
             };
+
+            // a.6 Translate the selected capability into the executable PlannedAction the safe
+            // runner already knows how to dispatch (reusing the existing ToolAdapter contract).
+            let (action_type, exec_tool) = selected
+                .capability
+                .to_executable()
+                .unwrap_or((crate::intelligence::actions::ActionType::Stop, "none"));
+            let mut action = crate::intelligence::actions::PlannedAction::new(
+                action_type,
+                exec_tool,
+                selected.target.clone(),
+                selected.reason.clone(),
+                (selected.score / 100.0).clamp(0.0, 1.0),
+            );
+            action.info_gain = selected.score_components.information_gain / 100.0;
+            action.relevance = selected.score_components.target_relevance / 100.0;
 
             // c. If planner explicitly decides STOP, terminate loop
             if action.action_type == ActionType::Stop {
@@ -294,6 +426,18 @@ impl AutonomousInvestigationRunner {
                 denied_action.completed_at = Some(Utc::now());
                 save_investigation_action(app_state, &denied_action).await;
                 actions_executed.push(denied_action);
+
+                {
+                    let mut p = serde_json::Map::new();
+                    p.insert("cycle".to_string(), json!(cycle));
+                    p.insert("decision_id".to_string(), json!(decision_id));
+                    p.insert("capability".to_string(), json!(selected.capability.as_str()));
+                    p.insert("tool".to_string(), json!(action.tool));
+                    p.insert("target".to_string(), json!(action.target));
+                    p.insert("reason".to_string(), json!("Scope boundary rejection (runner gate)"));
+                    p.insert("missing_prerequisite".to_string(), json!("Explicit scope authorization"));
+                    emit_planner_event(app_state, "planner.action_rejected", investigation_id, p);
+                }
 
                 // Record non-executable action so planner moves past it
                 state.record_executed_action(
@@ -358,6 +502,16 @@ impl AutonomousInvestigationRunner {
             save_investigation_action(app_state, &action_record).await;
 
             // g. Execute action through existing ToolAdapter with pre-execution snapshot
+            {
+                let mut p = serde_json::Map::new();
+                p.insert("cycle".to_string(), json!(cycle));
+                p.insert("decision_id".to_string(), json!(decision_id));
+                p.insert("job_id".to_string(), json!(job_id));
+                p.insert("capability".to_string(), json!(selected.capability.as_str()));
+                p.insert("tool".to_string(), json!(action.tool));
+                p.insert("target".to_string(), json!(action.target));
+                emit_planner_event(app_state, "planner.action_started", investigation_id, p);
+            }
             let pre_snapshot = crate::intelligence::telemetry::StateSnapshot::take(&state);
             let exec_start = Instant::now();
             let (stdout, stderr, _exit_code, is_success) =
@@ -418,7 +572,7 @@ impl AutonomousInvestigationRunner {
             let execution_record = crate::models::planner_decision::ActionExecution {
                 id: Uuid::new_v4(),
                 investigation_id,
-                decision_id: None,
+                decision_id: Some(decision_id),
                 action_type: action.action_type.as_str().to_string(),
                 capability: action.action_type.as_str().to_string(),
                 tool: action.tool.clone(),
@@ -461,6 +615,22 @@ impl AutonomousInvestigationRunner {
             action_record.new_assets_generated = metrics.new_assets_count as i32;
             action_record.completed_at = Some(Utc::now());
             save_investigation_action(app_state, &action_record).await;
+
+            // Emit the completion event with the observed state deltas for live auditability
+            {
+                let mut p = serde_json::Map::new();
+                p.insert("cycle".to_string(), json!(cycle));
+                p.insert("decision_id".to_string(), json!(decision_id));
+                p.insert("job_id".to_string(), json!(job_id));
+                p.insert("capability".to_string(), json!(selected.capability.as_str()));
+                p.insert("tool".to_string(), json!(action_record.tool));
+                p.insert("target".to_string(), json!(action_record.target));
+                p.insert("success".to_string(), json!(is_success));
+                p.insert("actual_information_gain".to_string(), json!(actual_ig));
+                p.insert("new_findings".to_string(), json!(metrics.new_findings_count));
+                p.insert("new_assets".to_string(), json!(metrics.new_assets_count));
+                emit_planner_event(app_state, "planner.action_completed", investigation_id, p);
+            }
             actions_executed.push(action_record);
 
             // l. Reconcile active security hypotheses against empirical observations
@@ -511,6 +681,52 @@ impl AutonomousInvestigationRunner {
             total_endpoints: state.endpoints.len(),
             total_information_gain: (total_ig * 100.0).round() / 100.0,
         })
+    }
+
+    /// Build bounded (0..10) advisory per-tool boosts fed into the deterministic Adaptive
+    /// Planner. Sources: the strategic VulnLLM prioritization (requirement 13: advisory only)
+    /// and the empirical/experience/policy `IntelligencePlanner` used purely as a recommender.
+    /// These signals never bypass preconditions, scope, or redundancy — they only nudge scoring.
+    fn build_advisory_boosts(
+        state: &InvestigationState,
+        history: Option<&HashMap<String, crate::intelligence::action_value::HistoricalToolStats>>,
+        prioritization: Option<&crate::intelligence::llm::prioritization::StrategicPrioritization>,
+        experience: Option<&[crate::models::experience::ExperienceAction]>,
+        archetype: Option<&crate::intelligence::archetype::ArchetypeClassification>,
+        profile: Option<&crate::models::target_profile::TargetProfile>,
+    ) -> HashMap<String, f64> {
+        let mut boosts: HashMap<String, f64> = HashMap::new();
+
+        // (1) Strategic VulnLLM prioritization → bounded advisory bonus keyed by tool.
+        if let Some(prio) = prioritization {
+            for (k, v) in &prio.action_boosts {
+                let tool = k.split(':').next().unwrap_or(k).to_string();
+                let bonus = (*v * 10.0).clamp(0.0, 10.0);
+                let entry = boosts.entry(tool).or_insert(0.0);
+                if bonus > *entry {
+                    *entry = bonus;
+                }
+            }
+        }
+
+        // (2) Empirical/experience/policy signal via the IntelligencePlanner recommender.
+        let advisory_plan = IntelligencePlanner::plan_with_policy(
+            state, history, prioritization, experience, archetype, profile,
+        );
+        if let Some(rec) = advisory_plan.recommended_action.as_ref() {
+            if !rec.is_stop() {
+                let entry = boosts.entry(rec.tool.clone()).or_insert(0.0);
+                *entry = (*entry + 3.0).min(10.0);
+            }
+        }
+        for alt in advisory_plan.alternatives.iter().take(3) {
+            if !alt.is_stop() {
+                let entry = boosts.entry(alt.tool.clone()).or_insert(0.0);
+                *entry = (*entry + 1.0).min(10.0);
+            }
+        }
+
+        boosts
     }
 
     /// Resolve existing program or create an in-memory/database program for the target
