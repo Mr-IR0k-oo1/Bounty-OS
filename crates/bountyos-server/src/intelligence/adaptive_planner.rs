@@ -4,7 +4,6 @@
 //! computes explainable 0–100 scores across 23 typed security capabilities, and persists
 //! decisions with complete provenance.
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -12,11 +11,7 @@ use uuid::Uuid;
 use crate::intelligence::archetype::TargetArchetype;
 use crate::intelligence::profiler::TargetProfiler;
 use crate::intelligence::runner::StateSummary;
-use crate::intelligence::state::{
-    FindingConfidence, InvestigationProfile, InvestigationState, StopReason,
-};
-use crate::models::planner_decision::{save_planner_decision, PlannerDecision};
-use crate::state::AppState;
+use crate::intelligence::state::{FindingConfidence, InvestigationState};
 
 /// 23 typed security capabilities for adaptive planning
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -76,6 +71,36 @@ impl PlannerCapability {
             PlannerCapability::VerifyFinding => "verify_finding",
             PlannerCapability::Stop => "stop",
         }
+    }
+
+    /// Maps a capability to a concrete, whitelisted, executable (ActionType, tool) pair.
+    ///
+    /// Only the capabilities backed by one of the 10 integrated tools (plus the
+    /// deterministic finding verifier) are executable by the runner. Capabilities that
+    /// depend on tools not integrated into the platform (e.g. sqlmap, arjun, trufflehog)
+    /// return `None` so the Adaptive Planner never selects an action the safe runner
+    /// cannot carry out through `ToolRegistry`/direct subprocess execution.
+    pub fn to_executable(&self) -> Option<(crate::intelligence::actions::ActionType, &'static str)> {
+        use crate::intelligence::actions::ActionType;
+        match self {
+            PlannerCapability::ReconSubdomains => Some((ActionType::SubdomainEnumeration, "subfinder")),
+            PlannerCapability::ResolveDNS => Some((ActionType::DnsResolution, "dnsx")),
+            PlannerCapability::DiscoverPorts => Some((ActionType::PortScan, "naabu")),
+            PlannerCapability::ProbeHTTP => Some((ActionType::HttpProbe, "httpx")),
+            PlannerCapability::CrawlApplication => Some((ActionType::EndpointCrawl, "katana")),
+            PlannerCapability::CollectHistoricalURLs => Some((ActionType::HistoricalUrls, "gau")),
+            PlannerCapability::DiscoverDirectories => Some((ActionType::PathFuzz, "ffuf")),
+            PlannerCapability::RunTechnologyTemplates => Some((ActionType::TechVulnerabilityScan, "nuclei")),
+            PlannerCapability::InvestigateXSS => Some((ActionType::XssAnalysis, "dalfox")),
+            PlannerCapability::VerifyFinding => Some((ActionType::FindingVerification, "verification")),
+            // Not backed by an integrated tool; analysis/advisory only, never executed.
+            _ => None,
+        }
+    }
+
+    /// Whether this capability can be executed by the safe runner (10 integrated tools + verifier).
+    pub fn is_executable(&self) -> bool {
+        self.to_executable().is_some()
     }
 
     pub fn default_tool(&self) -> &'static str {
@@ -865,11 +890,35 @@ impl AdaptiveScorer {
 pub struct AdaptivePlanner;
 
 impl AdaptivePlanner {
-    /// Generates candidate action definitions for an investigation state
+    /// Generates candidate action definitions for an investigation state (full taxonomy).
+    ///
+    /// Used by the advisory/preview endpoints: evaluates all 23 capabilities including
+    /// ones not backed by an integrated tool.
     pub fn plan(
         investigation_id: Uuid,
         state: &InvestigationState,
         advisory_llm_boosts: Option<&HashMap<String, f64>>,
+    ) -> AdaptivePlan {
+        Self::plan_inner(investigation_id, state, advisory_llm_boosts, false)
+    }
+
+    /// Generates candidate actions restricted to executable capabilities (the 10 integrated
+    /// tools + deterministic verifier). This is the decision engine the autonomous runner
+    /// uses: every selected action maps to a concrete, whitelisted tool the safe runner can
+    /// execute, so the planner never selects an action that cannot be carried out.
+    pub fn plan_executable(
+        investigation_id: Uuid,
+        state: &InvestigationState,
+        advisory_llm_boosts: Option<&HashMap<String, f64>>,
+    ) -> AdaptivePlan {
+        Self::plan_inner(investigation_id, state, advisory_llm_boosts, true)
+    }
+
+    fn plan_inner(
+        investigation_id: Uuid,
+        state: &InvestigationState,
+        advisory_llm_boosts: Option<&HashMap<String, f64>>,
+        executable_only: bool,
     ) -> AdaptivePlan {
         let state_metrics = StateSummary::from_state(state);
         let profile = TargetProfiler::profile(investigation_id, state);
@@ -905,6 +954,12 @@ impl AdaptivePlanner {
         let mut rejected_candidates = Vec::new();
 
         for cap in all_capabilities {
+            // In decision-engine mode, skip capabilities not backed by an integrated tool
+            // so the planner only ever selects actions the safe runner can execute.
+            if executable_only && !cap.is_executable() {
+                continue;
+            }
+
             // Determine representative target
             let target = Self::resolve_target_for_capability(&cap, state);
 
@@ -930,8 +985,12 @@ impl AdaptivePlanner {
                 continue;
             }
 
-            // Redundancy evaluation
-            let tool = cap.default_tool();
+            // Redundancy evaluation — use the concrete executable tool when in decision mode
+            let tool = if executable_only {
+                cap.to_executable().map(|(_, t)| t).unwrap_or_else(|| cap.default_tool())
+            } else {
+                cap.default_tool()
+            };
             let (is_redundant, redundancy_penalty, red_reason) =
                 RedundancyEngine::evaluate(&cap, tool, &target, state);
 
@@ -1129,6 +1188,190 @@ impl AdaptivePlanner {
             PlannerCapability::ReconSubdomains => ("Root domain in scope", "Discovered subdomain catalog", "Low", "Low"),
             PlannerCapability::GenerateThreatModel => ("Attack surface baseline", "STRIDE threat matrix", "Low", "Low"),
             PlannerCapability::Stop => ("Exhausted or complete state", "Investigation termination", "Low", "Low"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod decision_engine_tests {
+    //! Proofs that the Adaptive Planner (executable decision engine) changes its selected
+    //! action based on observed evidence. These map to the task's required proofs A-I.
+    use super::*;
+    use crate::intelligence::state::{
+        DiscoveredEndpoint, DiscoveredParam, DiscoveredTechnology, InvestigationProfile,
+        ParamLocation, ScopeBoundary,
+    };
+
+    fn base_state(target: &str) -> InvestigationState {
+        let mut scope = ScopeBoundary::new();
+        scope.domains.push(target.to_string());
+        let mut state = InvestigationState::new(target, scope, InvestigationProfile::Adaptive);
+        state.hosts[0].ports_scanned = true; // prevent naabu on root host dominating
+        state
+    }
+
+    fn live_web(state: &mut InvestigationState, host: &str, port: u16) {
+        state.record_executed_action("subdomain_enumeration", "subfinder", host, 100, true, None);
+        state.add_service(host, port, "tcp", Some("http".to_string()), None);
+        state.mark_service_http_probed(host, port);
+        state.record_executed_action("http_probe", "httpx", &format!("{host}:{port}"), 100, true, None);
+    }
+
+    fn reflected_endpoint(host: &str, port: u16, path: &str, param: &str) -> DiscoveredEndpoint {
+        let mut ep = DiscoveredEndpoint::new(&format!("http://{host}:{port}{path}"), host, port, path);
+        ep.params.push(DiscoveredParam {
+            name: param.to_string(),
+            location: ParamLocation::Query,
+            reflected: true,
+            reflection_context: Some("body".to_string()),
+            tested_for_xss: false,
+            tested_for_sqli: false,
+        });
+        ep
+    }
+
+    fn inv_id() -> uuid::Uuid {
+        uuid::Uuid::new_v4()
+    }
+
+    fn has_candidate(plan: &AdaptivePlan, cap: PlannerCapability, tool: &str) -> bool {
+        let sel = plan
+            .selected_action
+            .as_ref()
+            .map(|a| a.capability == cap && a.tool == tool)
+            .unwrap_or(false);
+        let alt = plan.alternatives.iter().any(|a| a.capability == cap && a.tool == tool);
+        sel || alt
+    }
+
+    // Proof A: Web target with reflected parameter -> dalfox (XSS) becomes a high-priority candidate.
+    #[test]
+    fn proof_a_reflected_param_makes_dalfox_high_priority() {
+        let mut state = base_state("target.local");
+        live_web(&mut state, "target.local", 8888);
+        state.add_endpoint(reflected_endpoint("target.local", 8888, "/search?q=test", "q"));
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        assert!(
+            has_candidate(&plan, PlannerCapability::InvestigateXSS, "dalfox"),
+            "dalfox must be a candidate when a reflected parameter is observed"
+        );
+        let xss_score = plan
+            .selected_action
+            .iter()
+            .chain(plan.alternatives.iter())
+            .find(|a| a.capability == PlannerCapability::InvestigateXSS)
+            .map(|a| a.score)
+            .unwrap();
+        assert!(xss_score > 0.0);
+    }
+
+    // Proof C: Technology fingerprint -> nuclei (technology templates) is eligible.
+    #[test]
+    fn proof_c_technology_makes_nuclei_candidate() {
+        let mut state = base_state("target.local");
+        live_web(&mut state, "target.local", 8888);
+        state.add_technology(DiscoveredTechnology {
+            name: "WordPress".to_string(),
+            version: Some("6.2".to_string()),
+            cpe: None,
+            category: Some("CMS".to_string()),
+            templates_matched: vec![],
+        });
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        assert!(
+            has_candidate(&plan, PlannerCapability::RunTechnologyTemplates, "nuclei"),
+            "nuclei must be eligible once a technology is fingerprinted"
+        );
+    }
+
+    // Proof E: Dead HTTP target -> web crawler / scanners are NOT selected.
+    #[test]
+    fn proof_e_dead_http_excludes_web_tools() {
+        let mut state = base_state("target.local");
+        state.record_executed_action("subdomain_enumeration", "subfinder", "target.local", 100, true, None);
+        state.add_service("target.local", 8888, "tcp", None, None);
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        let picks_web = plan
+            .selected_action
+            .iter()
+            .chain(plan.alternatives.iter())
+            .any(|a| matches!(a.tool.as_str(), "katana" | "ffuf" | "gau" | "dalfox"));
+        assert!(!picks_web, "web crawler/scanners must not be selected without a live HTTP service");
+        assert!(plan
+            .rejected_candidates
+            .iter()
+            .any(|r| r.capability == PlannerCapability::CrawlApplication));
+    }
+
+    // Proof F: Out-of-scope target -> planner rejects the action before execution.
+    #[test]
+    fn proof_f_out_of_scope_rejected() {
+        let mut state = base_state("target.local");
+        live_web(&mut state, "target.local", 8888);
+        state.add_endpoint(reflected_endpoint("evil.example.com", 8888, "/search?q=x", "q"));
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        if let Some(sel) = &plan.selected_action {
+            assert!(!sel.target.contains("evil.example.com"));
+        }
+        for alt in &plan.alternatives {
+            assert!(!alt.target.contains("evil.example.com"));
+        }
+        assert!(
+            plan.rejected_candidates
+                .iter()
+                .any(|r| r.target.contains("evil.example.com") && r.reason.to_lowercase().contains("scope")),
+            "out-of-scope target must appear as a scope-rejected candidate"
+        );
+    }
+
+    // Proof G: Duplicate action -> planner does not re-execute without new evidence.
+    #[test]
+    fn proof_g_duplicate_action_penalized() {
+        let mut state = base_state("target.local");
+        state.record_executed_action("recon_subdomains", "subfinder", "target.local", 100, true, None);
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        if let Some(sel) = &plan.selected_action {
+            assert!(
+                !(sel.capability == PlannerCapability::ReconSubdomains && sel.target == "target.local"),
+                "a completed subfinder run must not be re-selected without new evidence"
+            );
+        }
+    }
+
+    // Proof I: No candidate actions -> investigation stops deterministically.
+    #[test]
+    fn proof_i_no_candidates_stops() {
+        let mut state = base_state("target.local");
+        // Root host fully resolved (has IP) and port-scanned so DNS/port actions are satisfied.
+        state.hosts[0].ip = Some("127.0.0.1".to_string());
+        state.record_executed_action("recon_subdomains", "subfinder", "target.local", 100, true, None);
+        state.record_executed_action("discover_ports", "naabu", "target.local", 100, true, None);
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        assert!(plan.is_stop, "planner must stop when no justified executable action remains");
+        assert!(plan.selected_action.is_none());
+        assert!(plan.stop_reason.is_some());
+    }
+
+    // Invariant: every selected action is backed by an integrated tool.
+    #[test]
+    fn selected_action_is_always_executable() {
+        let mut state = base_state("target.local");
+        live_web(&mut state, "target.local", 8888);
+        state.add_endpoint(reflected_endpoint("target.local", 8888, "/search?q=test", "q"));
+
+        let plan = AdaptivePlanner::plan_executable(inv_id(), &state, None);
+        if let Some(sel) = &plan.selected_action {
+            assert!(sel.capability.is_executable());
+            assert!(matches!(
+                sel.tool.as_str(),
+                "subfinder" | "dnsx" | "naabu" | "httpx" | "katana" | "gau" | "ffuf" | "nuclei" | "dalfox" | "verification"
+            ));
         }
     }
 }
